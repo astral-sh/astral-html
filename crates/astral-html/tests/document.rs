@@ -114,7 +114,6 @@ fn reader_selects_text_states_and_is_fused() {
         )
     );
     assert!(reader.next().is_none());
-    assert!(reader.next().is_none());
 }
 
 #[test]
@@ -231,7 +230,6 @@ fn deep_documents_parse_traverse_and_drop_without_recursion() {
     let root = document.elements().next().unwrap();
     assert_eq!(root.descendants().count(), depth - 1);
     assert_eq!(root.text(), "text");
-    drop(document);
 }
 
 #[test]

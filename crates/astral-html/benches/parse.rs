@@ -28,7 +28,7 @@ fn main() {
     // `cargo test --all-targets` when the libtest harness is disabled.
     let test_mode = !std::env::args().any(|argument| argument == "--bench")
         || std::env::args().any(|argument| argument == "--test");
-    let cases: Vec<Case> = match std::env::var("ASTRAL_HTML_BENCH_SUITE").as_deref() {
+    let mut cases: Vec<Case> = match std::env::var("ASTRAL_HTML_BENCH_SUITE").as_deref() {
         Ok("uv") => support::uv_fixtures()
             .map(|(name, input, root_index)| Case {
                 name,
@@ -87,15 +87,9 @@ fn main() {
         _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default or uv"),
     };
 
-    let filter = std::env::var("ASTRAL_HTML_BENCH_CASE").ok();
-    let cases: Vec<_> = cases
-        .into_iter()
-        .filter(|case| {
-            filter
-                .as_deref()
-                .is_none_or(|filter| case.name.contains(filter))
-        })
-        .collect();
+    if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
+        cases.retain(|case| case.name.contains(&filter));
+    }
     assert!(!cases.is_empty(), "ASTRAL_HTML_BENCH_CASE matched no cases");
     let allocator = if cfg!(feature = "benchmark-jemalloc") {
         "jemalloc"
@@ -194,9 +188,9 @@ fn main() {
             reference / candidate,
             case.input.len() as f64 / candidate * 1e9 / (1024.0 * 1024.0),
             astral[samples / 10],
-            astral[(samples * 9 / 10).min(samples - 1)],
+            astral[samples * 9 / 10],
             baseline[samples / 10],
-            baseline[(samples * 9 / 10).min(samples - 1)],
+            baseline[samples * 9 / 10],
         );
     }
 }

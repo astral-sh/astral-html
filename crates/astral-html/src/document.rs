@@ -110,9 +110,8 @@ impl<'a> Document<'a> {
 
     /// Parse a document with caller-selected resource limits.
     ///
-    /// Malformed HTML follows tokenizer recovery and the document's lexical
-    /// scope rules. Only resource limits return errors; no partial document is
-    /// returned.
+    /// Malformed HTML follows tokenizer recovery and lexical scope rules. Only
+    /// resource-limit violations return errors; no partial document is returned.
     pub fn parse_with_limits(source: &'a str, limits: Limits) -> Result<Self, Error> {
         if source.len() > limits.max_input_bytes {
             return Err(Error::InputLimit);
@@ -260,7 +259,7 @@ impl<'a> Document<'a> {
     }
 }
 
-/// A borrowed, immutable view of one element in a [`Document`].
+/// A borrowed view of an element in a [`Document`].
 #[derive(Clone, Copy)]
 pub struct Element<'doc, 'src> {
     document: &'doc Document<'src>,
