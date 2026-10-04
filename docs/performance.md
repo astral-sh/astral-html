@@ -6,10 +6,39 @@ input. Both implementations run in the same executable and use the same
 allocator. URL handling, package validation, network requests, and resolution
 are outside the measured work.
 
-On this Linux host, the six uv index workloads were **1.04–2.43× faster with
-jemalloc**. The captured iniconfig response was 1.60× faster. These are ratios
-of measured medians, not a claim of a statistically significant improvement
-for every case. The smallest margins are about 5%.
+## Current hardening results
+
+After adding the parsed-attribute budget and allocation fixes, a fresh run on
+the same Linux host measured **0.90–2.33×** the performance of astral-tl across
+the six uv index workloads with jemalloc. Four remained faster. CodeArtifact
+and the flat-index fixture were about 11% slower in elapsed time, so the earlier
+claim of winning all six workloads no longer applies. The resource checks stay
+enabled; recovering that performance is open work.
+
+| Input | astral-html (µs) | astral-tl (µs) | Speedup |
+| --- | ---: | ---: | ---: |
+| PyPI iniconfig (captured) | 12.02 | 17.22 | 1.43× |
+| CodeArtifact (uv fixture) | 3.29 | 2.95 | 0.90× |
+| Flat index (uv fixture) | 1.97 | 1.78 | 0.90× |
+| Project index, 1,000 links (generated) | 925.24 | 1,337.28 | 1.45× |
+| Project index, 10,000 links (generated) | 11,018.37 | 25,715.82 | 2.33× |
+| Root index, 10,000 links (generated) | 4,524.32 | 8,932.31 | 1.97× |
+| 64 extra attributes per link (generated) | 815.86 | 845.47 | 1.04× |
+| 1 MiB text node (generated) | 20.64 | 19.68 | 0.95× |
+| 1,000 links with entities (generated) | 1,186.62 | 1,376.21 | 1.16× |
+
+This run uses the method below: 31 alternating samples, 100 ms combined
+warmup, CPU 24, and jemalloc. The [timing summaries](benchmarks/2026-10-04-hardening-jemalloc.csv)
+and [environment, binary, and source hashes](benchmarks/2026-10-04-hardening-environment.json)
+identify the tested implementation. These are measured medians from one host,
+not a universal performance guarantee. The system allocator was not rerun for
+this change.
+
+## Baseline before hardening
+
+The original implementation measured **1.04–2.43×** faster on the six uv index
+workloads with jemalloc. The captured iniconfig response was 1.60× faster. The
+smallest margins were about 5%; the results below are historical.
 
 The system allocator showed regressions on the CodeArtifact fixture and the
 generated root index. The 1 MiB plain-text case was slower with both allocators.

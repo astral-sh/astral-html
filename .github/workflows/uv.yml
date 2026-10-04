@@ -69,7 +69,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib 2>&1 | tee uv-integration.log
+          cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib --no-run
+          sha256sum uv-source/Cargo.lock > uv-integration-lock.sha256
+          cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib --locked 2>&1 | tee uv-integration.log
           python3 - <<'PY'
           from pathlib import Path
 
@@ -80,6 +82,9 @@ jobs:
         if: always()
         with:
           name: uv-client-html-tests
-          path: uv-integration.log
+          path: |
+            uv-integration.log
+            uv-integration-lock.sha256
+            uv-source/Cargo.lock
           if-no-files-found: warn
           retention-days: 30

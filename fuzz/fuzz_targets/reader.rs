@@ -8,9 +8,14 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     };
     let mut reader = Reader::new(source);
-    for (index, token) in reader.by_ref().enumerate() {
-        assert!(index <= source.len(), "reader must make progress");
+    let mut previous = 0;
+    while let Some(token) = reader.next() {
+        let position = reader.position();
+        assert!(position > previous, "each token must consume input");
+        assert!(source.is_char_boundary(position));
+        previous = position;
         std::hint::black_box(token);
     }
+    assert_eq!(reader.position(), source.len());
     assert!(reader.next().is_none(), "end of input must be permanent");
 });

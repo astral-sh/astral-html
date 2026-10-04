@@ -18,7 +18,7 @@ intentionally filters out. Generated cases remain outside version control.
 | `tokenize` | Progress and permanent EOF in all six states, including arbitrary fragment tag contexts |
 | `entities` | Character references in text and quoted attributes, compared with html5gum 0.8.4 |
 | `reader` | Automatic raw-text state transitions, progress, and permanent EOF |
-| `document` | Input, node, and depth limits; element traversal, attributes, and descendant text |
+| `document` | Exact input, node, and depth limits; attribute budgets; parent/child relationships, descendants, and text against a separate model |
 | `differential` | Token values against html5gum 0.8.4 in all six supported initial states |
 
 The differential target joins adjacent text tokens, sorts attributes, and ignores
@@ -79,9 +79,13 @@ Every job uploads compiler and revision metadata, corpus hashes, logs, generated
 inputs, and failure artifacts for 30 days, including when the campaign fails.
 
 Each input is limited to 16 KiB, with a five-second timeout and a 2 GiB resident
-memory ceiling. The document target also varies much smaller parser limits to
-exercise rejection paths. These limits make regressions reproducible; they do
-not establish a bound for every possible input accepted by the public API.
+memory ceiling. The document target checks inputs up to 4 KiB with an independent
+model of reader events. It compares every tag and exact resource thresholds;
+repeated subtree and ancestor comparisons are limited to documents with at most
+128 elements. The model shares the event reader, so tokenization is checked by
+the conformance corpus and differential target. The document target also varies
+the total parsed-attribute budget. These limits make regressions reproducible;
+they do not establish a bound for every input accepted by the public API.
 
 The workflow is an ongoing testing mechanism. A smoke run is not evidence of
 sustained coverage or production readiness. Record completed campaigns, compiler
