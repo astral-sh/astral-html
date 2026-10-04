@@ -4,56 +4,13 @@ mod support;
 
 #[test]
 fn uv_html_extraction_matches_astral_tl() {
-    macro_rules! compare {
-        ($root_index:literal; $($name:literal),+ $(,)?) => {
-            $(
-                let input = include_str!(concat!("fixtures/uv/", $name, ".html"));
-                assert_eq!(
-                    support::astral(input, $root_index),
-                    support::baseline(input, $root_index),
-                    concat!("uv fixture: ", $name)
-                );
-            )+
-        };
+    for (name, input, root_index) in support::uv_fixtures() {
+        assert_eq!(
+            support::astral(input, root_index),
+            support::baseline(input, root_index),
+            "uv fixture: {name}"
+        );
     }
-    compare!(false;
-        "parse_base",
-        "parse_code_artifact_index_html",
-        "parse_core_metadata",
-        "parse_egg_fragment",
-        "parse_empty_fragment",
-        "parse_empty_href",
-        "parse_encoded_fragment",
-        "parse_escaped_fragment",
-        "parse_file_requires_python_trailing_comma",
-        "parse_flat_index_html",
-        "parse_md5",
-        "parse_missing_hash",
-        "parse_missing_href",
-        "parse_optional_attributes_case_insensitively",
-        "parse_query_string",
-        "parse_quoted_filepath",
-        "parse_sha256",
-        "parse_simple_detail_with_project_status_and_emoji_reason",
-        "parse_simple_detail_with_project_status_and_reason",
-        "parse_simple_detail_with_project_status_no_reason",
-        "parse_simple_detail_with_unknown_project_status",
-        "parse_simple_html_case_insensitively",
-    );
-    compare!(true;
-        "parse_simple_html_case_insensitively_2",
-        "parse_simple_index",
-        "parse_simple_index_case_variations",
-        "parse_simple_index_empty_href",
-        "parse_simple_index_empty_text",
-        "parse_simple_index_missing_href",
-        "parse_simple_index_sorted",
-    );
-    compare!(false;
-        "parse_unknown_fragment",
-        "parse_unknown_hash",
-        "reject_invalid_hashes",
-    );
 }
 
 #[test]
