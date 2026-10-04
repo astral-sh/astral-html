@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: Namespace (${{ matrix.arch }})
+    name: Namespace Linux (${{ matrix.arch }})
     # https://namespace.so/docs/reference/github-actions/runner-configuration
     runs-on: nscloud-ubuntu-24.04-${{ matrix.arch }}-4x8
     timeout-minutes: 10
@@ -43,3 +43,50 @@ jobs:
           nproc
           free -h
           df -h "$RUNNER_TEMP"
+
+  macos:
+    name: Namespace macOS (arm64)
+    runs-on: nscloud-macos-sequoia-arm64-6x14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify runner and checkout
+        run: |
+          set -euxo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
+          test "$(git rev-parse --is-inside-work-tree)" = true
+          sw_vers
+          git --version
+          sysctl hw.ncpu hw.memsize
+          df -h "$RUNNER_TEMP"
+
+  windows:
+    name: Namespace Windows (amd64)
+    runs-on: nscloud-windows-2022-amd64-4x8
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify runner and checkout
+        shell: pwsh
+        run: |
+          if (-not $IsWindows) { throw "Expected Windows" }
+          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64') {
+            throw "Expected AMD64"
+          }
+          $os = Get-CimInstance Win32_OperatingSystem
+          if ($os.Caption -notlike '*Windows Server 2022*') {
+            throw "Expected Windows Server 2022, got $($os.Caption)"
+          }
+          if ((git rev-parse --is-inside-work-tree) -ne 'true') {
+            throw "Expected a Git checkout"
+          }
+          git --version
+          $os | Select-Object Caption, Version, OSArchitecture, TotalVisibleMemorySize
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfLogicalProcessors
+          Get-PSDrive -PSProvider FileSystem
