@@ -30,12 +30,13 @@ needed for these call sites.
 
 ## Entity decoding
 
-`Attribute::value` and `Element::text` return decoded HTML text. The existing uv
-adapter explicitly calls `html_escape::decode_html_entities` after reading most
+The `Attribute::value` field contains decoded attribute text, and `Element::text`
+returns decoded descendant text. The existing uv adapter explicitly calls
+`html_escape::decode_html_entities` after reading most
 attributes from astral-tl. Remove those calls when using the decoded API:
 decoding `&amp;lt;` twice would incorrectly produce `<` instead of `&lt;`.
-`Attribute::raw_value` field retains the input spelling when a caller needs it, and
-returns `None` for a boolean attribute. An absent attribute is represented by
+The `Attribute::raw_value` field retains the input spelling when a caller needs
+it and is `None` for a boolean attribute. An absent attribute is represented by
 `Element::attribute` returning `None`.
 
 There are deliberate differences from astral-tl outside the compatibility
@@ -53,10 +54,35 @@ retain their upstream test names, revision, and licenses. The comparison covers
 base URLs, project metadata, link attributes, boolean attributes, and root index
 text. Additional assertions check the decoded values uv consumes.
 
-This validates the parser boundary. It does not run uv's resolver, HTTP client,
-URL validation, or packaging logic, and does not constitute an upstream uv
-integration test. Before replacing the dependency in uv, update the adapter and
-run uv-client's tests and uv's index integration tests.
+These local comparisons validate the parser boundary. They do not run uv's
+resolver, HTTP client, URL validation, or packaging logic.
+
+## Pinned uv integration
+
+The [adapter patch](uv-integration.patch) replaces the parser in the pinned uv
+revision above. It uses borrowed `Document` and `Element` reads, removes the
+second character-reference decoding step, and removes uv-client's dependency on
+`html-escape`. All 31 upstream HTML test bodies and their assertions remain
+byte-for-byte unchanged.
+
+The [Linux integration workflow](../.github/workflows/uv.yml) checks out that
+exact uv revision into `uv-source`, applies the patch, verifies the unchanged
+test module, and runs:
+
+```console
+cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib
+```
+
+The job requires a successful result with all 31 tests passing and retains the
+test output as an artifact. It uses Rust 1.97.1, matching uv's 1.97 minimum
+version. The local patch application and Cargo metadata checks pass; a full
+local uv-client build was not attempted because the development host had only
+about 1 GiB of free disk space. The integration job must pass before treating
+the upstream tests as verified.
+
+The patch expects `uv-source` immediately below this repository, so its path
+dependency resolves to `../crates/astral-html`. The wider uv index and resolver
+integration suite remains a separate adoption check.
 
 ## Performance
 
