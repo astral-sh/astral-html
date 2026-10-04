@@ -279,7 +279,7 @@ impl<'a> Tokenizer<'a> {
                 None
             };
             // Scan small lists; index larger lists to avoid quadratic duplicate checks.
-            let duplicate = if attributes.len() < 8 {
+            let duplicate = if attributes.len() < 16 {
                 attributes
                     .iter()
                     .any(|attribute| attribute.name == attr_name)
