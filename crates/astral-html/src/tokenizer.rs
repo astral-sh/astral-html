@@ -826,7 +826,26 @@ impl<'a> Tokenizer<'a> {
                 Some(b'?') => return self.processing_instruction(),
                 _ => {
                     self.position += 1;
-                    return Some(Token::Text(Cow::Borrowed("<")));
+                    // Keep literal less-than signs in one text run so documents
+                    // do not retain a node for every byte of malformed markup.
+                    let bytes = self.source.as_bytes();
+                    loop {
+                        let Some(offset) = memchr(b'<', &bytes[self.position..]) else {
+                            self.position = bytes.len();
+                            break;
+                        };
+                        self.position += offset;
+                        if bytes.get(self.position + 1).is_some_and(|byte| {
+                            byte.is_ascii_alphabetic() || matches!(byte, b'/' | b'!' | b'?')
+                        }) {
+                            break;
+                        }
+                        self.position += 1;
+                    }
+                    return Some(Token::Text(decode(
+                        &self.source[start..self.position],
+                        false,
+                    )));
                 }
             }
         }

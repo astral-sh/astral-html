@@ -153,6 +153,21 @@ fn enforces_limits_at_boundaries() {
 }
 
 #[test]
+fn literal_less_than_runs_use_one_text_node() {
+    let text = "<0".repeat(32_768);
+    let source = format!("<a>{text}</a>");
+    let document = Document::parse_with_limits(
+        &source,
+        Limits {
+            max_nodes: 2,
+            ..Limits::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(document.elements().next().unwrap().text(), text);
+}
+
+#[test]
 fn deep_documents_parse_traverse_and_drop_without_recursion() {
     let depth = 10_000;
     let input = format!("{}text{}", "<div>".repeat(depth), "</div>".repeat(depth));
