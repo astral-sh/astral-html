@@ -38,6 +38,26 @@ fn borrows_ordinary_source_fields() {
 }
 
 #[test]
+fn comment_newlines_preserve_recovery_and_source_positions() {
+    for newline in ["\r", "\r\n", "\n"] {
+        for prefix in ["", "-", "x", "<", "<!", "<!-", "<!--", "x-", "--", "--!"] {
+            let comment = format!("<!--{prefix}{newline}\0-->");
+            let source = format!("{comment}<p>after");
+            let mut tokenizer = Tokenizer::new(&source);
+            assert_eq!(
+                tokenizer.next(),
+                Some(Token::Comment(Cow::Owned(format!("{prefix}\n�")))),
+                "{source:?}"
+            );
+            assert_eq!(tokenizer.position(), comment.len());
+            assert!(matches!(tokenizer.next(), Some(Token::StartTag(tag)) if tag.name == "p"));
+            assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
+            assert_eq!(tokenizer.next(), None);
+        }
+    }
+}
+
+#[test]
 fn preserves_first_attributes_across_deduplication_threshold() {
     for count in [0, 1, 7, 8, 9, 64, 1024] {
         let mut source = String::from("<a");

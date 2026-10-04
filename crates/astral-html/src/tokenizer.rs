@@ -311,7 +311,13 @@ impl<'a> Tokenizer<'a> {
         }
         let mut state = CommentState::Start;
         let mut data = String::new();
-        while let Some(ch) = self.source[self.position..].chars().next() {
+        while let Some(mut ch) = self.source[self.position..].chars().next() {
+            let mut width = ch.len_utf8();
+            // Normalize while scanning to avoid copying the entire comment afterward.
+            if ch == '\r' {
+                ch = '\n';
+                width += usize::from(self.source.as_bytes().get(self.position + 1) == Some(&b'\n'));
+            }
             let mut consume = true;
             match state {
                 CommentState::Start => match ch {
@@ -416,13 +422,9 @@ impl<'a> Tokenizer<'a> {
                 },
             }
             if consume {
-                self.position += ch.len_utf8();
+                self.position += width;
             }
         }
-        let data = match normalize(&data) {
-            Cow::Borrowed(_) => data,
-            Cow::Owned(normalized) => normalized,
-        };
         Token::Comment(Cow::Owned(data))
     }
 
