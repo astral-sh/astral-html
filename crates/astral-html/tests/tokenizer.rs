@@ -99,10 +99,7 @@ fn caller_can_select_text_context_after_a_start_tag() {
     tokenizer.set_state(State::Rcdata, Some("title"));
     assert_eq!(
         tokenizer.next(),
-        Some(Token::Text(Cow::Borrowed("a & <b>"))).map(|token| match token {
-            Token::Text(value) => Token::Text(Cow::Owned(value.into_owned())),
-            other => other,
-        })
+        Some(Token::Text(Cow::Borrowed("a & <b>")))
     );
     let Some(Token::EndTag(tag)) = tokenizer.next() else {
         panic!("expected title end tag")
@@ -112,4 +109,29 @@ fn caller_can_select_text_context_after_a_start_tag() {
         panic!("expected p start tag")
     };
     assert_eq!(tag.name, "p");
+}
+
+#[test]
+fn text_modes_only_recognize_ascii_letter_end_tag_names() {
+    for state in [State::Rcdata, State::Rawtext, State::ScriptData] {
+        for name in ["", "h1", "custom-element", "é", "a/b"] {
+            let source = format!("before</{name}>after");
+            for mut tokenizer in [Tokenizer::with_state(&source, state, Some(name)), {
+                let mut tokenizer = Tokenizer::new(&source);
+                tokenizer.set_state(state, Some(name));
+                tokenizer
+            }] {
+                assert_eq!(
+                    tokenizer.next(),
+                    Some(Token::Text(Cow::Borrowed(&source))),
+                    "{state:?}, {name:?}"
+                );
+                assert_eq!(tokenizer.next(), None);
+            }
+        }
+        let mut tokenizer = Tokenizer::with_state("before</CUSTOM>after", state, Some("custom"));
+        assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("before"))));
+        assert!(matches!(tokenizer.next(), Some(Token::EndTag(tag)) if tag.name == "custom"));
+        assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
+    }
 }

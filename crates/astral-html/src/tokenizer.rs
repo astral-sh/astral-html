@@ -123,14 +123,18 @@ impl<'a> Tokenizer<'a> {
             source,
             position: 0,
             state,
-            last_start_tag: last_start_tag.map(|name| Cow::Owned(name.to_ascii_lowercase())),
+            last_start_tag: last_start_tag
+                .filter(|name| can_end_text(name))
+                .map(|name| Cow::Owned(name.to_ascii_lowercase())),
         }
     }
 
     /// Select the text mode for the next token using caller-supplied tree context.
     pub fn set_state(&mut self, state: State, last_start_tag: Option<&str>) {
         self.state = state;
-        self.last_start_tag = last_start_tag.map(|name| Cow::Owned(name.to_ascii_lowercase()));
+        self.last_start_tag = last_start_tag
+            .filter(|name| can_end_text(name))
+            .map(|name| Cow::Owned(name.to_ascii_lowercase()));
     }
 
     /// Return the consumed source length in bytes.
@@ -267,7 +271,7 @@ impl<'a> Tokenizer<'a> {
         if end {
             Some(Token::EndTag(tag))
         } else {
-            self.last_start_tag = Some(tag.name.clone());
+            self.last_start_tag = can_end_text(&tag.name).then(|| tag.name.clone());
             Some(Token::StartTag(tag))
         }
     }
@@ -770,6 +774,11 @@ impl<'a> Iterator for Tokenizer<'a> {
 }
 
 impl FusedIterator for Tokenizer<'_> {}
+
+/// Validate a context name once: text-mode end-tag name states consume ASCII letters only.
+fn can_end_text(name: &str) -> bool {
+    !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_alphabetic())
+}
 
 /// Determine whether a byte is HTML whitespace before newline preprocessing.
 fn is_space(byte: u8) -> bool {
