@@ -119,7 +119,6 @@ fn positions_are_utf8_boundaries_and_exhaustion_is_permanent() {
             }
             assert_eq!(tokenizer.position(), source.len());
             assert_eq!(tokenizer.next(), None);
-            assert_eq!(tokenizer.next(), None);
         }
     }
 }

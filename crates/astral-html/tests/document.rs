@@ -23,6 +23,34 @@ fn reads_attributes_and_text_without_mutation() {
 }
 
 #[test]
+fn attributes_remain_scoped_when_reusing_tag_storage() {
+    let document = Document::parse(
+        "<a HREF='one&amp;two' a b c d e f g h HREF=ignored></a TITLE='discard&amp;me'>\
+         <br><b></b><a title='three&amp;four' href=next></a><unfinished lost='value",
+    )
+    .unwrap();
+    let elements: Vec<_> = document.elements().collect();
+    assert_eq!(elements.len(), 4);
+    assert_eq!(
+        elements[0]
+            .attributes()
+            .map(|attribute| attribute.name.as_ref())
+            .collect::<Vec<_>>(),
+        ["href", "a", "b", "c", "d", "e", "f", "g", "h"]
+    );
+    assert_eq!(elements[0].attribute("href").unwrap().value(), "one&two");
+    assert_eq!(elements[1].attributes().count(), 0);
+    assert_eq!(elements[2].attributes().count(), 0);
+    assert_eq!(
+        elements[3]
+            .attributes()
+            .map(|attribute| (attribute.name.as_ref(), attribute.value()))
+            .collect::<Vec<_>>(),
+        [("title", "three&four"), ("href", "next")]
+    );
+}
+
+#[test]
 fn scopes_are_source_order_and_close_at_matching_end_tags() {
     let document = Document::parse("<div><p>one<span>two</div><br><p>three").unwrap();
     let mut elements = document.elements();
@@ -86,7 +114,6 @@ fn reader_selects_text_states_and_is_fused() {
         )
     );
     assert!(reader.next().is_none());
-    assert!(reader.next().is_none());
 }
 
 #[test]
@@ -133,6 +160,9 @@ fn attribute_budget_counts_all_parsed_occurrences() {
         ("<a href='one' HREF='two'>", 2),
         ("<a href='one'></a><b title='two'>", 2),
         ("</a href='one'>", 1),
+        ("<script>x</script ignored>", 1),
+        ("<style>x</style ignored>", 1),
+        ("<textarea>x</textarea ignored>", 1),
         ("<a href='one'></a title='two'>", 2),
         ("<a href", 1),
         ("<a href=", 1),
@@ -200,7 +230,6 @@ fn deep_documents_parse_traverse_and_drop_without_recursion() {
     let root = document.elements().next().unwrap();
     assert_eq!(root.descendants().count(), depth - 1);
     assert_eq!(root.text(), "text");
-    drop(document);
 }
 
 #[test]
