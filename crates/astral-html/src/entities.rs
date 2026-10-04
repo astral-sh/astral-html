@@ -20,43 +20,48 @@ pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
     let Some(mut cursor) = first else {
         return Cow::Borrowed(input);
     };
-    let mut output = String::with_capacity(input.len());
-    output.push_str(&input[..cursor]);
+    let mut output = None;
+    let mut unchanged = 0;
     while cursor < bytes.len() {
-        match bytes[cursor] {
+        let (next, replacement) = match bytes[cursor] {
             b'&' => {
-                if let Some((consumed, replacement)) = reference(&input[cursor + 1..], attribute) {
-                    match replacement {
-                        Replacement::Character(character) => output.push(character),
-                        Replacement::Named(text) => output.push_str(text),
-                    }
-                    cursor += consumed + 1;
-                } else {
-                    output.push('&');
+                let Some((consumed, replacement)) = reference(&input[cursor + 1..], attribute)
+                else {
                     cursor += 1;
-                }
+                    continue;
+                };
+                (cursor + consumed + 1, replacement)
             }
-            b'\r' => {
-                output.push('\n');
-                cursor += 1 + usize::from(bytes.get(cursor + 1) == Some(&b'\n'));
-            }
-            0 if attribute => {
-                output.push('\u{fffd}');
-                cursor += 1;
-            }
+            b'\r' => (
+                cursor + 1 + usize::from(bytes.get(cursor + 1) == Some(&b'\n')),
+                Replacement::Character('\n'),
+            ),
+            0 if attribute => (cursor + 1, Replacement::Character('\u{fffd}')),
             _ => {
-                let end = if attribute {
+                cursor += if attribute {
                     memchr::memchr3(b'&', b'\r', 0, &bytes[cursor..])
                 } else {
                     memchr::memchr2(b'&', b'\r', &bytes[cursor..])
                 }
-                .map_or(bytes.len(), |offset| cursor + offset);
-                output.push_str(&input[cursor..end]);
-                cursor = end;
+                .unwrap_or(bytes.len() - cursor);
+                continue;
             }
+        };
+        let output = output.get_or_insert_with(|| String::with_capacity(input.len()));
+        output.push_str(&input[unchanged..cursor]);
+        match replacement {
+            Replacement::Character(character) => output.push(character),
+            Replacement::Named(text) => output.push_str(text),
         }
+        cursor = next;
+        unchanged = next;
     }
-    Cow::Owned(output)
+    if let Some(mut output) = output {
+        output.push_str(&input[unchanged..]);
+        Cow::Owned(output)
+    } else {
+        Cow::Borrowed(input)
+    }
 }
 
 /// Normalize HTML input newlines, leaving character references and NUL intact.
@@ -165,6 +170,28 @@ mod tests {
             "&notit; &amp=1 & ≂\u{338}"
         );
         assert_eq!(decode("&amp;lt;", true), "&lt;");
+    }
+
+    #[test]
+    fn unchanged_ampersands_borrow_the_input() {
+        for source in [
+            "a & b",
+            "?a=1&unknown=2",
+            "&unknown;",
+            "&#x;",
+            "é &unknown; 🦀",
+        ] {
+            for attribute in [false, true] {
+                assert!(
+                    matches!(decode(source, attribute), Cow::Borrowed(value) if value == source)
+                );
+            }
+        }
+        assert!(matches!(decode("&notit;", true), Cow::Borrowed("&notit;")));
+        assert_eq!(
+            decode("&unknown; then &amp; and &unknown;", false),
+            "&unknown; then & and &unknown;"
+        );
     }
 
     #[test]

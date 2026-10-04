@@ -1,6 +1,6 @@
 //! HTML text-state selection for source-order readers.
 
-use crate::{State, Token, Tokenizer};
+use crate::{Error, State, Token, Tokenizer};
 
 /// A source-order HTML event reader that selects text modes from start tags.
 ///
@@ -29,14 +29,16 @@ impl<'a> Reader<'a> {
     pub fn position(&self) -> usize {
         self.tokenizer.position()
     }
-}
 
-impl<'a> Iterator for Reader<'a> {
-    type Item = Token<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let token = self.tokenizer.next()?;
-        if let Token::StartTag(tag) = &token {
+    /// Read a token while charging parsed attributes to a document's budget.
+    pub(crate) fn next_with_attribute_budget(
+        &mut self,
+        remaining_attributes: &mut usize,
+    ) -> Option<Result<Token<'a>, Error>> {
+        let token = self
+            .tokenizer
+            .next_with_attribute_budget(remaining_attributes)?;
+        if let Ok(Token::StartTag(tag)) = &token {
             let state = match tag.name.as_ref() {
                 "title" | "textarea" => Some(State::Rcdata),
                 "style" | "xmp" | "iframe" | "noembed" | "noframes" => Some(State::Rawtext),
@@ -49,6 +51,16 @@ impl<'a> Iterator for Reader<'a> {
             }
         }
         Some(token)
+    }
+}
+
+impl<'a> Iterator for Reader<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut remaining_attributes = usize::MAX;
+        self.next_with_attribute_budget(&mut remaining_attributes)
+            .map(|token| token.expect("an unbounded reader cannot exhaust its attribute budget"))
     }
 }
 
