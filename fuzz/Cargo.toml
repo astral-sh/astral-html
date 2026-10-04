@@ -1,0 +1,51 @@
+[package]
+name = "astral-html-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+
+[dependencies]
+astral-html = { path = "../crates/astral-html" }
+html5gum = { version = "=0.8.4", default-features = false }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "tokenize"
+path = "fuzz_targets/tokenize.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "entities"
+path = "fuzz_targets/entities.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "reader"
+path = "fuzz_targets/reader.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "document"
+path = "fuzz_targets/document.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "differential"
+path = "fuzz_targets/differential.rs"
+test = false
+doc = false
+bench = false
