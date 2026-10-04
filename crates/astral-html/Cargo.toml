@@ -1,0 +1,20 @@
+[package]
+name = "astral-html"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A read-only HTML parser for package indexes"
+
+[dependencies]
+memchr.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+astral-tl.workspace = true
+html-escape.workspace = true
+
+[lints]
+workspace = true
+
