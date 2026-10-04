@@ -157,3 +157,24 @@ fn document_and_views_are_send_and_sync() {
     assert_send_sync::<Document<'static>>();
     assert_send_sync::<astral_html::Element<'static, 'static>>();
 }
+
+#[test]
+fn repeated_names_restore_scopes_after_name_index_promotion() {
+    let input = format!(
+        "{}inner</a>after</a>tail{}<a>sibling</a>",
+        "<a>".repeat(9),
+        "</a>".repeat(7)
+    );
+    let document = Document::parse(&input).unwrap();
+    let elements: Vec<_> = document.elements().collect();
+    assert_eq!(elements.len(), 10);
+    for element in &elements[..7] {
+        assert_eq!(element.text(), "inneraftertail");
+    }
+    assert_eq!(elements[7].text(), "innerafter");
+    assert_eq!(elements[8].text(), "inner");
+    assert_eq!(elements[9].text(), "sibling");
+    assert!(elements[0].parent().is_none());
+    assert!(elements[9].parent().is_none());
+    assert_eq!(elements[0].children().count(), 1);
+}
