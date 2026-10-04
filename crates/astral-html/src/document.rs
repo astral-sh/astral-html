@@ -5,15 +5,13 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Range;
 
-use crate::tokenizer::AttributeBudget;
 use crate::{Attribute, Reader, Token};
 
 /// Resource limits for constructing a document.
 ///
-/// The input limit is checked before tokenization. The attribute limit is
-/// checked before normalizing each attribute name or decoding its value. Node
-/// and depth limits are checked before retaining the next node. These checks
-/// are not fallible allocation or process-wide memory accounting.
+/// The input limit is checked before tokenization. Node and depth limits are
+/// checked before retaining the next node. These checks are not fallible
+/// allocation or process-wide memory accounting.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     /// Maximum number of input bytes (default: 128 MiB).
@@ -22,10 +20,6 @@ pub struct Limits {
     pub max_nodes: usize,
     /// Maximum number of simultaneously open non-void elements (default: 256).
     pub max_depth: usize,
-    /// Maximum total parsed attribute occurrences (default: 1 million).
-    ///
-    /// Includes duplicate names, end-tag attributes, and incomplete tags.
-    pub max_attributes: usize,
 }
 
 impl Default for Limits {
@@ -34,7 +28,6 @@ impl Default for Limits {
             max_input_bytes: 128 * 1024 * 1024,
             max_nodes: 4_000_000,
             max_depth: 256,
-            max_attributes: 1_000_000,
         }
     }
 }
@@ -48,8 +41,6 @@ pub enum Error {
     NodeLimit,
     /// The document has more simultaneously open elements than allowed.
     DepthLimit,
-    /// The input has more parsed attribute occurrences than allowed.
-    AttributeLimit,
 }
 
 impl fmt::Display for Error {
@@ -58,7 +49,6 @@ impl fmt::Display for Error {
             Self::InputLimit => "HTML input exceeds the byte limit",
             Self::NodeLimit => "HTML document exceeds the node limit",
             Self::DepthLimit => "HTML document exceeds the nesting limit",
-            Self::AttributeLimit => "HTML input exceeds the attribute limit",
         })
     }
 }
@@ -125,11 +115,8 @@ impl<'a> Document<'a> {
         // unmatched end tags cannot repeatedly scan an unbounded open stack.
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
         let mut reader = Reader::new(source);
-        let mut budget = AttributeBudget::new(limits.max_attributes);
         let mut attribute_buffer = Vec::new();
-        while let Some(token) =
-            reader.next_with_attribute_budget(&mut budget, &mut attribute_buffer)
-        {
+        while let Some(token) = reader.next_with_attribute_buffer(&mut attribute_buffer) {
             let mut attributes = match token {
                 Token::StartTag(mut tag) => {
                     let is_void = is_void(&tag.name);
@@ -212,7 +199,6 @@ impl<'a> Document<'a> {
                 attribute_buffer = attributes;
             }
         }
-        budget.check()?;
         document.close(&mut open, &mut names, 0);
         Ok(document)
     }
