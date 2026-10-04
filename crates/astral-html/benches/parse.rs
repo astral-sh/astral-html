@@ -3,6 +3,7 @@
 #[path = "../tests/support/mod.rs"]
 mod support;
 
+use std::fmt::Write;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
@@ -146,18 +147,16 @@ fn main() {
     }
 }
 
+/// Mean nanoseconds per parse-and-extract, including destruction of its output.
 fn measure(case: &Case, iterations: u64, parse: fn(&str, bool) -> support::Index) -> f64 {
     let start = Instant::now();
     for _ in 0..iterations {
-        // Include destruction of both parsed documents and extracted output.
         black_box(parse(black_box(&case.input), case.root_index));
     }
     start.elapsed().as_nanos() as f64 / iterations as f64
 }
 
 fn project_index(count: usize) -> String {
-    use std::fmt::Write;
-
     let mut input = String::from(
         "<!doctype html><html><head><meta name=\"pypi:project-status\" content=\"active\"></head><body>\n",
     );
@@ -169,8 +168,6 @@ fn project_index(count: usize) -> String {
 }
 
 fn root_index(count: usize) -> String {
-    use std::fmt::Write;
-
     let mut input =
         String::from("<!doctype html><html><head><title>Simple Index</title></head><body>\n");
     for project in 0..count {
@@ -185,8 +182,6 @@ fn root_index(count: usize) -> String {
 }
 
 fn attribute_index(count: usize, attributes: usize) -> String {
-    use std::fmt::Write;
-
     let mut input = String::from("<html><body>");
     for link in 0..count {
         write!(input, "<a href=/demo-{link}.whl").unwrap();

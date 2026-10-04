@@ -4,173 +4,55 @@ mod support;
 
 #[test]
 fn uv_html_extraction_matches_astral_tl() {
-    compare(
+    macro_rules! compare {
+        ($root_index:literal; $($name:literal),+ $(,)?) => {
+            $(
+                let input = include_str!(concat!("fixtures/uv/", $name, ".html"));
+                assert_eq!(
+                    support::astral(input, $root_index),
+                    support::baseline(input, $root_index),
+                    concat!("uv fixture: ", $name)
+                );
+            )+
+        };
+    }
+    compare!(false;
         "parse_base",
-        include_str!("fixtures/uv/parse_base.html"),
-        false,
-    );
-    compare(
         "parse_code_artifact_index_html",
-        include_str!("fixtures/uv/parse_code_artifact_index_html.html"),
-        false,
-    );
-    compare(
         "parse_core_metadata",
-        include_str!("fixtures/uv/parse_core_metadata.html"),
-        false,
-    );
-    compare(
         "parse_egg_fragment",
-        include_str!("fixtures/uv/parse_egg_fragment.html"),
-        false,
-    );
-    compare(
         "parse_empty_fragment",
-        include_str!("fixtures/uv/parse_empty_fragment.html"),
-        false,
-    );
-    compare(
         "parse_empty_href",
-        include_str!("fixtures/uv/parse_empty_href.html"),
-        false,
-    );
-    compare(
         "parse_encoded_fragment",
-        include_str!("fixtures/uv/parse_encoded_fragment.html"),
-        false,
-    );
-    compare(
         "parse_escaped_fragment",
-        include_str!("fixtures/uv/parse_escaped_fragment.html"),
-        false,
-    );
-    compare(
         "parse_file_requires_python_trailing_comma",
-        include_str!("fixtures/uv/parse_file_requires_python_trailing_comma.html"),
-        false,
-    );
-    compare(
         "parse_flat_index_html",
-        include_str!("fixtures/uv/parse_flat_index_html.html"),
-        false,
-    );
-    compare(
         "parse_md5",
-        include_str!("fixtures/uv/parse_md5.html"),
-        false,
-    );
-    compare(
         "parse_missing_hash",
-        include_str!("fixtures/uv/parse_missing_hash.html"),
-        false,
-    );
-    compare(
         "parse_missing_href",
-        include_str!("fixtures/uv/parse_missing_href.html"),
-        false,
-    );
-    compare(
         "parse_optional_attributes_case_insensitively",
-        include_str!("fixtures/uv/parse_optional_attributes_case_insensitively.html"),
-        false,
-    );
-    compare(
         "parse_query_string",
-        include_str!("fixtures/uv/parse_query_string.html"),
-        false,
-    );
-    compare(
         "parse_quoted_filepath",
-        include_str!("fixtures/uv/parse_quoted_filepath.html"),
-        false,
-    );
-    compare(
         "parse_sha256",
-        include_str!("fixtures/uv/parse_sha256.html"),
-        false,
-    );
-    compare(
         "parse_simple_detail_with_project_status_and_emoji_reason",
-        include_str!("fixtures/uv/parse_simple_detail_with_project_status_and_emoji_reason.html"),
-        false,
-    );
-    compare(
         "parse_simple_detail_with_project_status_and_reason",
-        include_str!("fixtures/uv/parse_simple_detail_with_project_status_and_reason.html"),
-        false,
-    );
-    compare(
         "parse_simple_detail_with_project_status_no_reason",
-        include_str!("fixtures/uv/parse_simple_detail_with_project_status_no_reason.html"),
-        false,
-    );
-    compare(
         "parse_simple_detail_with_unknown_project_status",
-        include_str!("fixtures/uv/parse_simple_detail_with_unknown_project_status.html"),
-        false,
-    );
-    compare(
         "parse_simple_html_case_insensitively",
-        include_str!("fixtures/uv/parse_simple_html_case_insensitively.html"),
-        false,
     );
-    compare(
+    compare!(true;
         "parse_simple_html_case_insensitively_2",
-        include_str!("fixtures/uv/parse_simple_html_case_insensitively_2.html"),
-        true,
-    );
-    compare(
         "parse_simple_index",
-        include_str!("fixtures/uv/parse_simple_index.html"),
-        true,
-    );
-    compare(
         "parse_simple_index_case_variations",
-        include_str!("fixtures/uv/parse_simple_index_case_variations.html"),
-        true,
-    );
-    compare(
         "parse_simple_index_empty_href",
-        include_str!("fixtures/uv/parse_simple_index_empty_href.html"),
-        true,
-    );
-    compare(
         "parse_simple_index_empty_text",
-        include_str!("fixtures/uv/parse_simple_index_empty_text.html"),
-        true,
-    );
-    compare(
         "parse_simple_index_missing_href",
-        include_str!("fixtures/uv/parse_simple_index_missing_href.html"),
-        true,
-    );
-    compare(
         "parse_simple_index_sorted",
-        include_str!("fixtures/uv/parse_simple_index_sorted.html"),
-        true,
     );
-    compare(
+    compare!(false;
         "parse_unknown_fragment",
-        include_str!("fixtures/uv/parse_unknown_fragment.html"),
-        false,
-    );
-    compare(
         "parse_unknown_hash",
-        include_str!("fixtures/uv/parse_unknown_hash.html"),
-        false,
-    );
-    compare(
         "reject_invalid_hashes",
-        include_str!("fixtures/uv/reject_invalid_hashes.html"),
-        false,
-    );
-}
-
-fn compare(name: &str, input: &str, root_index: bool) {
-    assert_eq!(
-        support::astral(input, root_index),
-        support::baseline(input, root_index),
-        "uv fixture: {name}"
     );
 }
 

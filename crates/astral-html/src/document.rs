@@ -18,7 +18,7 @@ pub struct Limits {
     pub max_input_bytes: usize,
     /// Maximum total number of retained element and text nodes (default: 4 million).
     pub max_nodes: usize,
-    /// Maximum number of simultaneously open elements (default: 256).
+    /// Maximum number of simultaneously open non-void elements (default: 256).
     pub max_depth: usize,
     /// Maximum total parsed attribute occurrences (default: 1 million).
     ///
@@ -65,11 +65,11 @@ impl std::error::Error for Error {}
 
 /// An immutable source-order document with borrowed strings.
 ///
-/// Every start tag creates an element. A matching end tag closes that element
-/// and any still-open descendants; unmatched end tags are ignored. HTML void
-/// elements close immediately. The self-closing flag on other HTML elements
-/// is ignored. Remaining elements close at EOF. No elements are implied,
-/// relocated, or cloned: this is not the HTML browser tree-building algorithm.
+/// Each emitted start tag creates an element. An end tag closes the innermost
+/// open element with that name and its descendants; unmatched end tags are
+/// ignored. HTML void elements close immediately. The self-closing flag on other
+/// HTML elements is ignored. Remaining elements close at EOF. No elements are
+/// implied, relocated, or cloned: this is not the HTML browser tree-building algorithm.
 ///
 /// Construction, traversal, and destruction use flat storage without recursion.
 pub struct Document<'a> {
@@ -79,6 +79,7 @@ pub struct Document<'a> {
 struct Node<'a> {
     kind: Kind<'a>,
     parent: Option<usize>,
+    // Exclusive subtree endpoint; text and void elements end at the next node.
     end: usize,
 }
 
@@ -89,6 +90,7 @@ enum Kind<'a> {
 
 struct Open {
     node: usize,
+    // Previous stack depth with the same name, once the name index is enabled.
     previous: Option<usize>,
 }
 
@@ -99,6 +101,10 @@ impl<'a> Document<'a> {
     }
 
     /// Parse a document with caller-selected resource limits.
+    ///
+    /// Malformed HTML follows tokenizer recovery and the document's lexical
+    /// scope rules. Only resource limits return errors; no partial document is
+    /// returned.
     pub fn parse_with_limits(source: &'a str, limits: Limits) -> Result<Self, Error> {
         if source.len() > limits.max_input_bytes {
             return Err(Error::InputLimit);
@@ -121,6 +127,7 @@ impl<'a> Document<'a> {
                     if index >= limits.max_nodes {
                         return Err(Error::NodeLimit);
                     }
+                    let parent = open.last().map(|entry| entry.node);
                     if !is_void {
                         if open.len() == 8 && names.is_none() {
                             let mut index = HashMap::new();
@@ -140,12 +147,6 @@ impl<'a> Document<'a> {
                             previous,
                         });
                     }
-                    let parent = if is_void {
-                        open.last()
-                    } else {
-                        open.len().checked_sub(2).map(|index| &open[index])
-                    }
-                    .map(|entry| entry.node);
                     document.nodes.push(Node {
                         kind: Kind::Element(tag),
                         parent,
@@ -216,7 +217,6 @@ impl<'a> Document<'a> {
         self.elements_in(0, self.nodes.len())
     }
 
-    /// Iterate over element nodes in a contiguous subtree range.
     fn elements_in(&self, start: usize, end: usize) -> impl Iterator<Item = Element<'_, 'a>> {
         (start..end).filter_map(|index| {
             matches!(self.nodes[index].kind, Kind::Element(_)).then_some(Element {
@@ -235,7 +235,6 @@ pub struct Element<'doc, 'src> {
 }
 
 impl<'doc, 'src> Element<'doc, 'src> {
-    /// Read the element's start tag.
     fn tag(self) -> &'doc Tag<'src> {
         let Kind::Element(tag) = &self.document.nodes[self.index].kind else {
             unreachable!()
@@ -243,7 +242,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
         tag
     }
 
-    /// Return the normalized, ASCII lowercase name.
+    /// Return the normalized name, with ASCII letters lowercased.
     pub fn name(self) -> &'doc str {
         &self.tag().name
     }
@@ -254,6 +253,9 @@ impl<'doc, 'src> Element<'doc, 'src> {
     }
 
     /// Find an attribute without ASCII case sensitivity. The first occurrence wins.
+    ///
+    /// Values are already decoded; [`Attribute::raw_value`] preserves their
+    /// source spelling.
     pub fn attribute(self, name: &str) -> Option<&'doc Attribute<'src>> {
         self.tag()
             .attributes
@@ -271,7 +273,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
         self.tag().attributes.iter()
     }
 
-    /// Return the containing element, if any.
+    /// Return the containing lexical element, or `None` for a root element.
     pub fn parent(self) -> Option<Self> {
         self.document.nodes[self.index].parent.map(|index| Self {
             document: self.document,
@@ -305,11 +307,12 @@ impl<'doc, 'src> Element<'doc, 'src> {
         })
     }
 
-    /// Concatenate decoded descendant text, excluding comments and declarations.
+    /// Concatenate descendant text in source order, excluding comments and declarations.
     ///
-    /// This returns tokenizer text, not rendered text: no layout whitespace is
-    /// inserted and script/style contents remain present. A single text segment
-    /// is borrowed from the document.
+    /// Character references are decoded according to the tokenizer state and
+    /// remain literal in script/style contents. No layout whitespace is inserted.
+    /// A single segment borrows from the document; multiple segments allocate.
+    /// With no text, this returns a borrowed empty string.
     pub fn text(self) -> Cow<'doc, str> {
         let end = self.document.nodes[self.index].end;
         let mut segments = self.document.nodes[self.index + 1..end]
@@ -347,7 +350,6 @@ impl fmt::Debug for Element<'_, '_> {
     }
 }
 
-/// Determine whether an HTML start tag has no contents.
 fn is_void(name: &str) -> bool {
     matches!(
         name,

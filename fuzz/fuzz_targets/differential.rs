@@ -13,7 +13,7 @@ enum Canonical {
     Doctype(String, Option<String>, Option<String>, bool),
 }
 
-/// Token boundaries in adjacent character data are not observable HTML semantics.
+/// Coalesce adjacent text so tokenizer-specific chunk boundaries do not affect comparison.
 fn push(tokens: &mut Vec<Canonical>, token: Canonical) {
     if let Canonical::Text(text) = &token {
         if text.is_empty() {
@@ -70,39 +70,40 @@ fn oracle(source: &str, state: html5gum::State, last_start_tag: Option<&str>) ->
     for token in tokenizer {
         let token = match token.unwrap() {
             html5gum::Token::StartTag(tag) => Canonical::Start(
-                String::from_utf8(tag.name.to_vec()).unwrap(),
+                String::from_utf8(tag.name.into()).unwrap(),
                 tag.attributes
                     .into_iter()
                     .map(|(name, value)| {
                         (
-                            String::from_utf8(name.to_vec()).unwrap(),
-                            String::from_utf8(value.to_vec()).unwrap(),
+                            String::from_utf8(name.into()).unwrap(),
+                            String::from_utf8(value.value.into()).unwrap(),
                         )
                     })
                     .collect(),
                 tag.self_closing,
             ),
             html5gum::Token::EndTag(tag) => {
-                Canonical::End(String::from_utf8(tag.name.to_vec()).unwrap())
+                Canonical::End(String::from_utf8(tag.name.into()).unwrap())
             }
             html5gum::Token::String(text) => {
-                Canonical::Text(String::from_utf8(text.to_vec()).unwrap())
+                Canonical::Text(String::from_utf8(text.value.into()).unwrap())
             }
             html5gum::Token::Comment(text) => {
-                Canonical::Comment(String::from_utf8(text.to_vec()).unwrap())
+                Canonical::Comment(String::from_utf8(text.value.into()).unwrap())
             }
-            html5gum::Token::Doctype(doctype) => Canonical::Doctype(
-                String::from_utf8(doctype.name.to_vec()).unwrap(),
-                doctype
-                    .public_identifier
-                    .as_ref()
-                    .map(|id| String::from_utf8(id.to_vec()).unwrap()),
-                doctype
-                    .system_identifier
-                    .as_ref()
-                    .map(|id| String::from_utf8(id.to_vec()).unwrap()),
-                doctype.force_quirks,
-            ),
+            html5gum::Token::Doctype(doctype) => {
+                let doctype = doctype.value;
+                Canonical::Doctype(
+                    String::from_utf8(doctype.name.into()).unwrap(),
+                    doctype
+                        .public_identifier
+                        .map(|id| String::from_utf8(id.into()).unwrap()),
+                    doctype
+                        .system_identifier
+                        .map(|id| String::from_utf8(id.into()).unwrap()),
+                    doctype.force_quirks,
+                )
+            }
             html5gum::Token::Error(_) => continue,
         };
         push(&mut tokens, token);

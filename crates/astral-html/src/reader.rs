@@ -11,8 +11,9 @@ use crate::{Error, State, Token, Tokenizer};
 /// transitions, or fragment insertion modes. Use [`Tokenizer`] to select an
 /// explicit tokenizer state when a caller supplies that context.
 ///
-/// The reader retains only the current token and borrows unchanged strings
-/// from its input. The event reader does not impose resource limits.
+/// Events borrow unchanged strings from the input. The reader does not retain
+/// returned tokens or impose resource limits. Once exhausted, it keeps returning
+/// `None`.
 pub struct Reader<'a> {
     tokenizer: Tokenizer<'a>,
 }
@@ -26,11 +27,16 @@ impl<'a> Reader<'a> {
     }
 
     /// Return the consumed byte offset in the original UTF-8 input.
+    ///
+    /// This includes skipped input and incomplete tags discarded at EOF.
     pub fn position(&self) -> usize {
         self.tokenizer.position()
     }
 
     /// Read a token while charging parsed attributes to a document's budget.
+    ///
+    /// Incomplete tags consume budget even when EOF discards them. The caller
+    /// must stop on an error; the tokenizer has not finished the current tag.
     pub(crate) fn next_with_attribute_budget(
         &mut self,
         remaining_attributes: &mut usize,

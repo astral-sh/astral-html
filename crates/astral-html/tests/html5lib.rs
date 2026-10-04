@@ -159,12 +159,7 @@ fn html5lib_tokenizer() {
         failures.is_empty(),
         "{} failures:\n{}",
         failures.len(),
-        failures
-            .iter()
-            .take(40)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n\n")
+        failures[..failures.len().min(40)].join("\n\n")
     );
     assert_eq!(runs, 7045, "unexpected tokenizer coverage");
     assert_eq!(excluded_surrogates, 4);

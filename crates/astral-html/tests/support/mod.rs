@@ -10,8 +10,8 @@ const ATTRIBUTES: [&str; 6] = [
     "data-upload-time",
 ];
 
-#[derive(Debug, PartialEq, Eq)]
 /// Parsed HTML fields at uv's parser boundary.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Index {
     /// The first base URL before any link.
     pub base: Option<String>,
@@ -21,12 +21,12 @@ pub(crate) struct Index {
     pub links: Vec<Link>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
 /// The fields uv reads from an anchor.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Link {
     /// Decoded download URL or project URL.
     pub href: String,
-    /// The outer option distinguishes absent attributes from boolean attributes.
+    /// `None` is absent; `Some(None)` is a boolean attribute.
     pub attributes: [Option<Option<String>>; 6],
     /// Root index project name, when requested.
     pub text: Option<String>,

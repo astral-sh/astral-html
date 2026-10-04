@@ -4,12 +4,11 @@ use std::borrow::Cow;
 
 use crate::entities_data::NAMED;
 
-/// Decode HTML character references, normalizing CRLF and CR to LF.
+/// Decode HTML character references and normalize input CRLF and CR to LF.
 ///
-/// Set `attribute` for attribute values: legacy references without a semicolon
-/// are not consumed before an ASCII alphanumeric character or `=`, and literal
-/// NUL characters become U+FFFD. The returned string borrows `input` when no
-/// transformation is needed. Decoding is a single pass: `&amp;lt;` becomes `&lt;`.
+/// In attribute mode, NUL becomes U+FFFD and semicolonless named references are left
+/// intact before ASCII letters, digits, or `=`. Unchanged input is borrowed.
+/// References are decoded once: `&amp;lt;` becomes `&lt;`.
 pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let first = if attribute {
@@ -89,7 +88,7 @@ enum Replacement {
     Named(&'static str),
 }
 
-/// Read a reference after its leading ampersand, with bounded named lookahead.
+/// Decode a reference after `&`, returning the number of bytes consumed after it.
 fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
     let bytes = input.as_bytes();
     if bytes.first() == Some(&b'#') {
@@ -114,8 +113,7 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
         return Some((end, Replacement::Character(numeric(number))));
     }
 
-    // The longest WHATWG name is 32 ASCII bytes, including its semicolon.
-    // Bounding this scan also bounds work for arbitrarily long unknown names.
+    // Bound unknown names by the longest WHATWG reference (32 bytes including `;`).
     let mut end = 0;
     while end < 32 && bytes.get(end).is_some_and(u8::is_ascii_alphanumeric) {
         end += 1;
