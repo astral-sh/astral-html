@@ -99,39 +99,6 @@ pub enum Token<'a> {
     },
 }
 
-/// Stops tokenization when exhausted. Call [`Self::check`] after the token loop.
-pub(crate) struct AttributeBudget {
-    remaining: usize,
-    exceeded: bool,
-}
-
-impl AttributeBudget {
-    pub(crate) fn new(remaining: usize) -> Self {
-        Self {
-            remaining,
-            exceeded: false,
-        }
-    }
-
-    fn consume(&mut self) -> Option<()> {
-        if self.remaining == 0 {
-            self.exceeded = true;
-            None
-        } else {
-            self.remaining -= 1;
-            Some(())
-        }
-    }
-
-    pub(crate) fn check(&self) -> Result<(), crate::Error> {
-        if self.exceeded {
-            Err(crate::Error::AttributeLimit)
-        } else {
-            Ok(())
-        }
-    }
-}
-
 /// An HTML tokenizer over borrowed UTF-8 input.
 ///
 /// Tree construction is left to the caller, which selects text modes with
@@ -208,12 +175,7 @@ impl<'a> Tokenizer<'a> {
 
     /// Parse a tag, discarding it if EOF arrives before `>`.
     #[inline(always)]
-    fn tag(
-        &mut self,
-        end: bool,
-        budget: &mut AttributeBudget,
-        attribute_buffer: &mut Vec<Attribute<'a>>,
-    ) -> Option<Token<'a>> {
+    fn tag(&mut self, end: bool, attribute_buffer: &mut Vec<Attribute<'a>>) -> Option<Token<'a>> {
         self.position += if end { 2 } else { 1 };
         let name = self.name(false);
         let (attributes, self_closing) = if self.current() == Some(b'>') {
@@ -223,7 +185,7 @@ impl<'a> Tokenizer<'a> {
             self.position += 2;
             (Vec::new(), true)
         } else {
-            self.attributes(budget, attribute_buffer)?
+            self.attributes(attribute_buffer)?
         };
         let tag = Tag {
             name,
@@ -265,7 +227,6 @@ impl<'a> Tokenizer<'a> {
     #[inline(never)]
     fn attributes(
         &mut self,
-        budget: &mut AttributeBudget,
         attribute_buffer: &mut Vec<Attribute<'a>>,
     ) -> Option<(Vec<Attribute<'a>>, bool)> {
         let mut attributes = std::mem::take(attribute_buffer);
@@ -289,7 +250,6 @@ impl<'a> Tokenizer<'a> {
                 }
                 _ => {}
             }
-            budget.consume()?;
             let attr_name = self.name(true);
             self.whitespace();
             let raw_value = if self.current() == Some(b'=') {
@@ -750,13 +710,11 @@ impl<'a> Tokenizer<'a> {
         at
     }
 
-    /// Count each attribute before allocating its name or value.
-    /// Duplicates and end-tag attributes count. Exhaustion returns `None`; callers
-    /// must check the budget after the token loop and must not resume tokenization.
+    /// Read the next token, reusing the supplied attribute buffer when possible.
+    ///
     /// The attribute buffer must be empty; returned tags may take ownership of it.
-    pub(crate) fn next_with_attribute_budget(
+    pub(crate) fn next_with_attribute_buffer(
         &mut self,
-        budget: &mut AttributeBudget,
         attribute_buffer: &mut Vec<Attribute<'a>>,
     ) -> Option<Token<'a>> {
         loop {
@@ -780,7 +738,7 @@ impl<'a> Tokenizer<'a> {
                 State::Rcdata | State::Rawtext | State::ScriptData => {
                     if self.appropriate_end(start) {
                         self.state = State::Data;
-                        return self.tag(true, budget, attribute_buffer);
+                        return self.tag(true, attribute_buffer);
                     }
                     let end = if self.state == State::ScriptData {
                         self.script_end(start)
@@ -831,11 +789,11 @@ impl<'a> Tokenizer<'a> {
             let rest = &self.source.as_bytes()[start..];
             match rest.get(1).copied() {
                 Some(byte) if byte.is_ascii_alphabetic() => {
-                    return self.tag(false, budget, attribute_buffer);
+                    return self.tag(false, attribute_buffer);
                 }
                 Some(b'/') => match rest.get(2).copied() {
                     Some(byte) if byte.is_ascii_alphabetic() => {
-                        return self.tag(true, budget, attribute_buffer);
+                        return self.tag(true, attribute_buffer);
                     }
                     Some(b'>') => {
                         self.position += 3;
@@ -879,7 +837,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_attribute_budget(&mut AttributeBudget::new(usize::MAX), &mut Vec::new())
+        self.next_with_attribute_buffer(&mut Vec::new())
     }
 }
 
@@ -926,7 +884,7 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
     }
 }
 
-/// Replace NUL, reusing owned buffers instead of allocating a second string.
+/// Replace NUL, reusing owned buffers.
 #[inline(never)]
 fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
     if input.as_bytes().contains(&0) {
@@ -936,7 +894,7 @@ fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
     }
 }
 
-/// Replace known NULs without adding expansion machinery to the unchanged path.
+/// Keep the expansion stack frame out of the unchanged-token path.
 #[inline(never)]
 fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
     let Cow::Owned(input) = input else {
@@ -966,8 +924,7 @@ fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
 mod tests {
     use std::borrow::Cow;
 
-    use super::{AttributeBudget, Tokenizer, replace_null};
-    use crate::Error;
+    use super::replace_null;
 
     #[test]
     fn owned_null_replacement_reuses_spare_capacity() {
@@ -979,20 +936,5 @@ mod tests {
             assert_eq!(output, source.replace('\0', "\u{fffd}"));
             assert_eq!(output.as_ptr(), allocation);
         }
-    }
-
-    #[test]
-    fn attribute_budget_stops_before_scanning_the_next_name() {
-        let source = "<a first='one' HREF='two&amp;three'>";
-        let mut tokenizer = Tokenizer::new(source);
-        let mut budget = AttributeBudget::new(1);
-        assert!(
-            tokenizer
-                .next_with_attribute_budget(&mut budget, &mut Vec::new())
-                .is_none()
-        );
-        assert_eq!(budget.check(), Err(Error::AttributeLimit));
-        assert_eq!(budget.remaining, 0);
-        assert_eq!(tokenizer.position(), source.find("HREF").unwrap());
     }
 }

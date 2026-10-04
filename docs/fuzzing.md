@@ -18,7 +18,7 @@ The differential target joins adjacent text tokens, sorts attributes, and ignore
 
 The entity target excludes `<`, `"`, NUL, and CR to isolate reference decoding from markup and input normalization. Other targets exercise those characters.
 
-The document model uses explicit child links and shares `Reader`, so it checks document structure rather than tokenizer correctness. It compares all tags and exact input, node, and depth thresholds for inputs up to 4 KiB, and varies the attribute budget. Repeated ancestor, subtree, and text comparisons are limited to 128 elements. Larger inputs up to 16 KiB still exercise parsing and bounded traversal and text queries.
+The document model uses explicit child links and shares `Reader`, so it checks document structure rather than tokenizer correctness. It compares all tags and exact input, node, and depth thresholds for inputs up to 4 KiB. Repeated ancestor, subtree, and text comparisons are limited to 128 elements. Larger inputs up to 16 KiB still exercise parsing and bounded traversal and text queries.
 
 ## Run locally
 

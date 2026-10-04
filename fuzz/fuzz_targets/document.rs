@@ -173,7 +173,6 @@ fuzz_target!(|bytes: &[u8]| {
         max_input_bytes: source.len(),
         max_nodes: source.len(),
         max_depth: source.len(),
-        max_attributes: source.len(),
     };
     let document = Document::parse_with_limits(source, roomy).expect("nonbinding limits");
     // Preserve larger-input parsing and query coverage while bounding the
@@ -220,36 +219,10 @@ fuzz_target!(|bytes: &[u8]| {
             Error::InputLimit => tight.max_input_bytes = used - 1,
             Error::NodeLimit => tight.max_nodes = used - 1,
             Error::DepthLimit => tight.max_depth = used - 1,
-            Error::AttributeLimit => unreachable!(),
         }
         assert_eq!(
             Document::parse_with_limits(source, tight).err(),
             Some(error)
         );
-    }
-
-    // Retained elements omit duplicate names, end-tag attributes and incomplete
-    // tags, so their attributes are only a lower bound on the budget consumed.
-    let budget = bytes.iter().fold(0_usize, |hash, &byte| {
-        hash.rotate_left(1) ^ usize::from(byte)
-    }) % 16;
-    match Document::parse_with_limits(
-        source,
-        Limits {
-            max_attributes: budget,
-            ..roomy
-        },
-    ) {
-        Ok(document) => {
-            model.check(&document);
-            assert!(
-                document
-                    .elements()
-                    .map(|el| el.attributes().count())
-                    .sum::<usize>()
-                    <= budget
-            );
-        }
-        Err(error) => assert_eq!(error, Error::AttributeLimit),
     }
 });
