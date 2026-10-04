@@ -145,6 +145,10 @@ ASTRAL_HTML_BENCH_SAMPLES=31 cargo bench -p astral-html --bench parse --locked -
 ASTRAL_HTML_BENCH_SUITE=uv ASTRAL_HTML_BENCH_SAMPLES=31 ASTRAL_HTML_BENCH_SAMPLE_MS=50 cargo bench -p astral-html --bench parse --locked --features benchmark-jemalloc
 ```
 
+`benchmark-jemalloc` selects jemalloc on Linux x86-64 and AArch64. On other
+targets, the benchmark uses and reports the system allocator even when the
+feature is enabled.
+
 `ASTRAL_HTML_BENCH_SUITE=uv` selects the 32 pinned uv fixtures; omitting it or
 using `default` selects the nine captured/generated cases.
 `ASTRAL_HTML_BENCH_CASE` filters case names by substring. Set

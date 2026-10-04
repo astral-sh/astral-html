@@ -13,7 +13,11 @@ use std::fmt::Write;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "benchmark-jemalloc")]
+#[cfg(all(
+    feature = "benchmark-jemalloc",
+    target_os = "linux",
+    any(target_arch = "x86_64", target_arch = "aarch64")
+))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
@@ -97,7 +101,11 @@ fn main() {
         })
         .collect();
     assert!(!cases.is_empty(), "ASTRAL_HTML_BENCH_CASE matched no cases");
-    let allocator = if cfg!(feature = "benchmark-jemalloc") {
+    let allocator = if cfg!(all(
+        feature = "benchmark-jemalloc",
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    )) {
         "jemalloc"
     } else {
         "system"
