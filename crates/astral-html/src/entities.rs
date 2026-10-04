@@ -69,6 +69,11 @@ fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> 
     }
     if let Some(mut output) = output {
         output.push_str(&input[unchanged..]);
+        // Numeric references can consume arbitrarily many digits for one character.
+        // Keep small buffers to avoid reallocating ordinary short attribute values.
+        if output.capacity() > 64 && output.capacity() > output.len().saturating_mul(2) {
+            output.shrink_to_fit();
+        }
         Cow::Owned(output)
     } else {
         Cow::Borrowed(input)
@@ -212,6 +217,27 @@ mod tests {
         );
         assert_eq!(decode("&#999999999999999999999999;", true), "�");
         assert_eq!(decode("&#x; &#; &#65=", true), "&#x; &#; A=");
+    }
+
+    #[test]
+    fn compressed_references_do_not_retain_input_sized_buffers() {
+        for (source, expected) in [
+            (format!("&#{}65;", "0".repeat(1024 * 1024)), "A".to_owned()),
+            (format!("&#x{}41;", "0".repeat(1024 * 1024)), "A".to_owned()),
+            ("&#65;".repeat(8192), "A".repeat(8192)),
+            (
+                "&CounterClockwiseContourIntegral;".repeat(8192),
+                "∳".repeat(8192),
+            ),
+        ] {
+            for attribute in [false, true] {
+                let Cow::Owned(decoded) = decode(&source, attribute) else {
+                    panic!("decoded references must be owned");
+                };
+                assert_eq!(decoded, expected);
+                assert!(decoded.capacity() <= 2 * decoded.len());
+            }
+        }
     }
 
     #[test]
