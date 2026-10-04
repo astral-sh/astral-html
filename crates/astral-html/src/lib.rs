@@ -5,7 +5,9 @@
 
 mod entities;
 mod entities_data;
+mod reader;
 mod tokenizer;
 
 pub use entities::{decode, normalize};
+pub use reader::Reader;
 pub use tokenizer::{Attribute, Doctype, State, Tag, Token, Tokenizer};
