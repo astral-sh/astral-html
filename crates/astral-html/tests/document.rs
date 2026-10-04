@@ -122,7 +122,6 @@ fn enforces_limits_at_boundaries() {
         max_input_bytes: 4,
         max_nodes: 1,
         max_depth: 1,
-        max_attributes: 0,
     };
     assert!(Document::parse_with_limits("<a>", limits).is_ok());
     assert!(matches!(
@@ -151,68 +150,6 @@ fn enforces_limits_at_boundaries() {
         )
         .is_ok()
     );
-}
-
-#[test]
-fn attribute_budget_counts_all_parsed_occurrences() {
-    for (source, count) in [
-        ("<a href='one'>", 1),
-        ("<a href='one' HREF='two'>", 2),
-        ("<a href='one'></a><b title='two'>", 2),
-        ("</a href='one'>", 1),
-        ("<script>x</script ignored>", 1),
-        ("<style>x</style ignored>", 1),
-        ("<textarea>x</textarea ignored>", 1),
-        ("<a href='one'></a title='two'>", 2),
-        ("<a href", 1),
-        ("<a href=", 1),
-        ("<a href='one", 1),
-        ("<a href=one", 1),
-        ("<a href='one'></a title=", 2),
-    ] {
-        let limits = Limits {
-            max_attributes: count,
-            ..Limits::default()
-        };
-        assert!(
-            Document::parse_with_limits(source, limits).is_ok(),
-            "{source}"
-        );
-        assert!(
-            matches!(
-                Document::parse_with_limits(
-                    source,
-                    Limits {
-                        max_attributes: count - 1,
-                        ..limits
-                    },
-                ),
-                Err(Error::AttributeLimit)
-            ),
-            "{source}"
-        );
-    }
-}
-
-#[test]
-fn zero_attribute_budget_allows_attribute_free_tokens() {
-    let limits = Limits {
-        max_attributes: 0,
-        ..Limits::default()
-    };
-    for source in [
-        "",
-        "<a></a><br>",
-        "<!-- <a href='one'> -->",
-        "<script><a href='one'></script>",
-        "<textarea><a href='one'></textarea>",
-        "<plaintext><a href='one'>",
-    ] {
-        assert!(
-            Document::parse_with_limits(source, limits).is_ok(),
-            "{source}"
-        );
-    }
 }
 
 #[test]

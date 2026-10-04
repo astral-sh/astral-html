@@ -1,6 +1,5 @@
 //! HTML text-state selection for source-order readers.
 
-use crate::tokenizer::AttributeBudget;
 use crate::{Attribute, State, Token, Tokenizer};
 
 /// A source-order HTML event reader that selects text modes from start tags.
@@ -32,15 +31,12 @@ impl<'a> Reader<'a> {
     }
 
     /// Select text states while applying
-    /// [`Tokenizer::next_with_attribute_budget`]'s budget and buffer contract.
-    pub(crate) fn next_with_attribute_budget(
+    /// [`Tokenizer::next_with_attribute_buffer`]'s buffer contract.
+    pub(crate) fn next_with_attribute_buffer(
         &mut self,
-        budget: &mut AttributeBudget,
         attribute_buffer: &mut Vec<Attribute<'a>>,
     ) -> Option<Token<'a>> {
-        let token = self
-            .tokenizer
-            .next_with_attribute_budget(budget, attribute_buffer);
+        let token = self.tokenizer.next_with_attribute_buffer(attribute_buffer);
         if let Some(Token::StartTag(tag)) = &token {
             let state = match tag.name.as_ref() {
                 "title" | "textarea" => Some(State::Rcdata),
@@ -61,7 +57,7 @@ impl<'a> Iterator for Reader<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_attribute_budget(&mut AttributeBudget::new(usize::MAX), &mut Vec::new())
+        self.next_with_attribute_buffer(&mut Vec::new())
     }
 }
 
