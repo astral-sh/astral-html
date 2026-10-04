@@ -1,0 +1,301 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -295,7 +295,7 @@
+ terminal_size = { version = "0.4.2", default-features = false }
+ textwrap = { version = "0.16.1", default-features = false, features = ["smawk", "unicode-width"] }
+ thiserror = { version = "2.0.0", default-features = false, features = ["std"] }
+-astral-tl = { version = "0.8.0", default-features = false }
++astral-html = { path = "../crates/astral-html" }
+ tokio = { version = "1.40.0", default-features = false, features = [
+   "fs",
+   "io-util",
+--- a/crates/uv-client/Cargo.toml
++++ b/crates/uv-client/Cargo.toml
+@@ -45,7 +45,7 @@
+ uv-warnings = { workspace = true }
+ 
+ anyhow = { workspace = true }
+-astral-tl = { workspace = true }
++astral-html = { workspace = true }
+ async-trait = { workspace = true }
+ async_http_range_reader = { workspace = true }
+ async_zip = { workspace = true }
+@@ -54,7 +54,6 @@
+ futures = { workspace = true }
+ hex = { workspace = true }
+ h2 = { workspace = true }
+-html-escape = { workspace = true }
+ http = { workspace = true }
+ itertools = { workspace = true }
+ jiff = { workspace = true }
+--- a/crates/uv-client/src/html.rs
++++ b/crates/uv-client/src/html.rs
+@@ -1,8 +1,8 @@
+ use std::{borrow::Cow, str::FromStr, sync::Arc};
+ 
++use astral_html::{Document, Element};
+ use jiff::Timestamp;
+ use rustc_hash::FxHashMap;
+-use tl::{HTMLTag, Node, Parser};
+ use tracing::{debug, instrument, warn};
+ 
+ use uv_normalize::PackageName;
+@@ -35,33 +35,20 @@
+ }
+ 
+ /// Return `true` if this tag has the given HTML element name.
+-fn is_tag(tag: &HTMLTag<'_>, name: &[u8]) -> bool {
++fn is_tag(tag: &Element<'_, '_>, name: &[u8]) -> bool {
+     tag.name().as_bytes().eq_ignore_ascii_case(name)
+ }
+ 
+ /// Return the value of the attribute with the given case-insensitive HTML attribute name.
+-fn attribute<'a>(tag: &'a HTMLTag<'_>, name: &'a str) -> Option<Cow<'a, str>> {
+-    tag.attributes()
+-        .get(name)
+-        .flatten()
+-        .map(tl::Bytes::as_utf8_str)
+-        .or_else(|| {
+-            tag.attributes().iter().find_map(|(attribute_name, value)| {
+-                attribute_name
+-                    .eq_ignore_ascii_case(name)
+-                    .then_some(value)
+-                    .flatten()
+-            })
+-        })
++fn attribute<'a>(tag: &'a Element<'_, '_>, name: &'a str) -> Option<Cow<'a, str>> {
++    tag.attribute(name)
++        .filter(|attribute| attribute.raw_value.is_some())
++        .map(|attribute| Cow::Borrowed(attribute.value.as_ref()))
+ }
+ 
+ /// Return `true` if the tag has the given case-insensitive HTML attribute name.
+-fn has_attribute<'a>(tag: &'a HTMLTag<'_>, name: &'a str) -> bool {
+-    tag.attributes().contains(name)
+-        || tag
+-            .attributes()
+-            .iter()
+-            .any(|(attribute_name, _)| attribute_name.eq_ignore_ascii_case(name))
++fn has_attribute<'a>(tag: &'a Element<'_, '_>, name: &'a str) -> bool {
++    tag.has_attribute(name)
+ }
+ 
+ /// A parsed structure from PyPI "HTML" index format for a single package.
+@@ -80,29 +67,26 @@
+     /// Parse the list of [`PypiFile`]s from the simple HTML page returned by the given URL.
+     #[instrument(skip_all, fields(url = % url))]
+     pub(crate) fn parse(text: &str, url: &DisplaySafeUrl) -> Result<Self, Error> {
+-        let dom = tl::parse(text, tl::ParserOptions::default())?;
++        let dom = Document::parse(text)?;
+ 
+         // Project status information appears in the `<meta>` tags in the `<head>`.
+         // Specifically, it appears as `name="pypi:project-status"`
+         // and `name="pypi:project-status-reason"` with corresponding
+         // `content` attributes.
+         let project_status = dom
+-            .nodes()
+-            .iter()
+-            .find(|node| node.as_tag().is_some_and(|tag| is_tag(tag, b"head")))
+-            .and_then(|head| Self::parse_project_status(dom.parser(), head))
++            .elements()
++            .find(|element| is_tag(element, b"head"))
++            .and_then(Self::parse_project_status)
+             .unwrap_or_default();
+ 
+         // Parse the first `<base>` tag, if any, to determine the base URL to which all
+         // relative URLs should be resolved. The HTML spec requires that the `<base>` tag
+         // appear before other tags with attribute values of URLs.
+         let base = BaseUrl::from(
+-            dom.nodes()
+-                .iter()
+-                .filter_map(|node| node.as_tag())
++            dom.elements()
+                 .take_while(|tag| !is_tag(tag, b"a") && !is_tag(tag, b"link"))
+                 .find(|tag| is_tag(tag, b"base"))
+-                .map(|base| Self::parse_base(base))
++                .map(|base| Self::parse_base(&base))
+                 .transpose()?
+                 .flatten()
+                 .unwrap_or_else(|| url.clone()),
+@@ -111,11 +95,9 @@
+         // Parse each `<a>` tag, to extract the filename, hash, and URL.
+         let mut interner = RequiresPythonInterner::default();
+         let mut files: Vec<PypiFile> = dom
+-            .nodes()
+-            .iter()
+-            .filter_map(|node| node.as_tag())
++            .elements()
+             .filter(|link| is_tag(link, b"a"))
+-            .map(|link| Self::parse_anchor(link, &mut interner))
++            .map(|link| Self::parse_anchor(&link, &mut interner))
+             .filter_map(|result| match result {
+                 Ok(None) => None,
+                 Ok(Some(file)) => Some(Ok(file)),
+@@ -142,18 +124,11 @@
+     /// Parse a [`ProjectStatus`] from the `<meta>` tags in the given `<head>`.
+     ///
+     /// Precondition: `head` is a `<head>` tag.
+-    fn parse_project_status(parser: &Parser, head: &Node) -> Option<ProjectStatus> {
+-        let children = head.children()?;
+-
++    fn parse_project_status(head: Element<'_, '_>) -> Option<ProjectStatus> {
+         let mut status: Option<Status> = None;
+         let mut reason: Option<SmallString> = None;
+-        for node in children.all(parser) {
+-            let tag = match node.as_tag() {
+-                Some(tag) if is_tag(tag, b"meta") => tag,
+-                _ => continue,
+-            };
+-
+-            let Some(name) = attribute(tag, "name") else {
++        for tag in head.descendants().filter(|tag| is_tag(tag, b"meta")) {
++            let Some(name) = attribute(&tag, "name") else {
+                 continue;
+             };
+ 
+@@ -162,14 +137,16 @@
+             match name.as_ref() {
+                 "pypi:project-status" => {
+                     status = {
+-                        let status = attribute(tag, "content").as_deref().and_then(Status::new)?;
++                        let status = attribute(&tag, "content")
++                            .as_deref()
++                            .and_then(Status::new)?;
+                         Some(status)
+                     };
+                 }
+                 "pypi:project-status-reason" => {
+                     reason = {
+                         let Some(content) =
+-                            attribute(tag, "content").as_deref().map(SmallString::from)
++                            attribute(&tag, "content").as_deref().map(SmallString::from)
+                         else {
+                             // TODO: Make this a hard error instead?
+                             warn!("Invalid project status reason (missing)");
+@@ -191,7 +168,7 @@
+     }
+ 
+     /// Parse the `href` from a `<base>` tag.
+-    fn parse_base(base: &HTMLTag) -> Result<Option<DisplaySafeUrl>, Error> {
++    fn parse_base(base: &Element<'_, '_>) -> Result<Option<DisplaySafeUrl>, Error> {
+         let Some(href) = attribute(base, "href") else {
+             return Ok(None);
+         };
+@@ -204,7 +181,7 @@
+     ///
+     /// Returns `None` if the `<a>` doesn't have an `href` attribute.
+     fn parse_anchor(
+-        link: &HTMLTag,
++        link: &Element<'_, '_>,
+         interner: &mut RequiresPythonInterner,
+     ) -> Result<Option<PypiFile>, Error> {
+         // Extract the href.
+@@ -213,7 +190,7 @@
+         };
+ 
+         // Extract the hash, which should be in the fragment.
+-        let decoded = html_escape::decode_html_entities(&href);
++        let decoded: &str = href.as_ref();
+         let (path, hashes) = if let Some((path, fragment)) = decoded.split_once('#') {
+             let fragment = percent_encoding::percent_decode_str(fragment).decode_utf8()?;
+             (
+@@ -249,7 +226,7 @@
+                 },
+             )
+         } else {
+-            (decoded.as_ref(), Hashes::default())
++            (decoded, Hashes::default())
+         };
+ 
+         // Extract the filename from the body text, which MUST match that of
+@@ -271,8 +248,6 @@
+         // `data-requires-python` attribute.
+         let requires_python = if let Some(requires_python) = attribute(link, "data-requires-python")
+         {
+-            let requires_python = std::str::from_utf8(requires_python.as_bytes())?;
+-            let requires_python = html_escape::decode_html_entities(requires_python);
+             Some(interner.parse(requires_python.as_ref()))
+         } else {
+             None
+@@ -284,8 +259,6 @@
+         let core_metadata = if let Some(dist_info_metadata) = attribute(link, "data-core-metadata")
+             .or_else(|| attribute(link, "data-dist-info-metadata"))
+         {
+-            let dist_info_metadata = std::str::from_utf8(dist_info_metadata.as_bytes())?;
+-            let dist_info_metadata = html_escape::decode_html_entities(dist_info_metadata);
+             match dist_info_metadata.as_ref() {
+                 "true" => Some(CoreMetadata::Bool(true)),
+                 "false" => Some(CoreMetadata::Bool(false)),
+@@ -305,8 +278,6 @@
+         // attribute.
+         let yanked = if has_attribute(link, "data-yanked") {
+             if let Some(yanked) = attribute(link, "data-yanked") {
+-                let yanked = std::str::from_utf8(yanked.as_bytes())?;
+-                let yanked = html_escape::decode_html_entities(yanked);
+                 Some(Box::new(Yanked::Reason(yanked.into())))
+             } else {
+                 Some(Box::new(Yanked::Bool(true)))
+@@ -318,16 +289,13 @@
+         // Extract the `size` field, which should be set on the `data-size` attribute. This isn't
+         // included in PEP 700, which omits the HTML API, but we respect it anyway. Since this
+         // field isn't standardized, we discard errors.
+-        let size = attribute(link, "data-size")
+-            .and_then(|size| html_escape::decode_html_entities(&size).parse().ok());
++        let size = attribute(link, "data-size").and_then(|size| size.parse().ok());
+ 
+         // Extract the `upload-time` field, which should be set on the `data-upload-time` attribute. This isn't
+         // included in PEP 700, which omits the HTML API, but we respect it anyway. Since this
+         // field isn't standardized, we discard errors.
+-        let upload_time = attribute(link, "data-upload-time").and_then(|upload_time| {
+-            let upload_time = html_escape::decode_html_entities(&upload_time);
+-            Timestamp::from_str(&upload_time).ok()
+-        });
++        let upload_time = attribute(link, "data-upload-time")
++            .and_then(|upload_time| Timestamp::from_str(&upload_time).ok());
+ 
+         Ok(Some(PypiFile {
+             core_metadata,
+@@ -352,16 +320,13 @@
+ impl SimpleIndexHtml {
+     /// Parse the list of project names from the Simple API index HTML page.
+     pub(crate) fn parse(text: &str) -> Result<Self, Error> {
+-        let dom = tl::parse(text, tl::ParserOptions::default())?;
++        let dom = Document::parse(text)?;
+ 
+         // Parse each `<a>` tag to extract the project name.
+-        let parser = dom.parser();
+         let mut projects = dom
+-            .nodes()
+-            .iter()
+-            .filter_map(|node| node.as_tag())
++            .elements()
+             .filter(|link| is_tag(link, b"a"))
+-            .filter_map(|link| Self::parse_anchor_project_name(link, parser))
++            .filter_map(|link| Self::parse_anchor_project_name(&link))
+             .collect::<Vec<_>>();
+ 
+         // Sort for deterministic ordering.
+@@ -373,12 +338,12 @@
+     /// Parse a project name from an `<a>` tag.
+     ///
+     /// Returns `None` if the `<a>` doesn't have an `href` attribute or text content.
+-    fn parse_anchor_project_name(link: &HTMLTag, parser: &tl::Parser) -> Option<PackageName> {
++    fn parse_anchor_project_name(link: &Element<'_, '_>) -> Option<PackageName> {
+         // Extract the href.
+         attribute(link, "href").filter(|href| !href.is_empty())?;
+ 
+         // Extract the text content, which should be the project name.
+-        let inner_text = link.inner_text(parser);
++        let inner_text = link.text();
+         let project_name = inner_text.trim();
+ 
+         if project_name.is_empty() {
+@@ -401,7 +366,7 @@
+     UrlParse(String, #[source] DisplaySafeUrlError),
+ 
+     #[error(transparent)]
+-    HtmlParse(#[from] tl::ParseError),
++    HtmlParse(#[from] astral_html::Error),
+ 
+     #[error("Missing href attribute on anchor link: `{0}`")]
+     MissingHref(String),

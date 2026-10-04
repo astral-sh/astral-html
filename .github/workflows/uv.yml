@@ -1,0 +1,85 @@
+name: uv integration
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - 'docs/uv-integration.patch'
+      - '.github/workflows/uv.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uv-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  uv-client:
+    name: uv-client HTML tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUSTUP_TOOLCHAIN: '1.97.1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: astral-sh/uv
+          ref: 46b84fd0bfec23b72f29e8e2185ba68a65052f48
+          path: uv-source
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: '1.97.1'
+      - name: Apply the parser adapter and preserve upstream tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C uv-source apply --check ../docs/uv-integration.patch
+          git -C uv-source apply ../docs/uv-integration.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import subprocess
+
+          path = "crates/uv-client/src/html.rs"
+          original = subprocess.check_output(
+              ["git", "-C", "uv-source", "show", f"HEAD:{path}"], text=True
+          )
+          adapted = (Path("uv-source") / path).read_text()
+          marker = "#[cfg(test)]"
+          original_tests = original[original.index(marker):]
+          adapted_tests = adapted[adapted.index(marker):]
+          assert original_tests == adapted_tests, "upstream tests changed"
+          assert original_tests.count("#[test]") == 31
+          print("Unchanged upstream test module:", hashlib.sha256(original_tests.encode()).hexdigest())
+          PY
+      - name: Run the original uv-client HTML tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib 2>&1 | tee uv-integration.log
+          python3 - <<'PY'
+          from pathlib import Path
+
+          output = Path("uv-integration.log").read_text()
+          assert "test result: ok. 31 passed; 0 failed;" in output, "expected all 31 uv HTML tests"
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: uv-client-html-tests
+          path: uv-integration.log
+          if-no-files-found: warn
+          retention-days: 30
