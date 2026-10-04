@@ -819,13 +819,22 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
 }
 
 /// Replace NUL, reusing owned buffers instead of allocating a second string.
+#[inline(never)]
 fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
-    let Some(first) = memchr(0, input.as_bytes()) else {
-        return input;
-    };
+    if input.as_bytes().contains(&0) {
+        replace_null_slow(input)
+    } else {
+        input
+    }
+}
+
+/// Replace known NULs without adding expansion machinery to the unchanged path.
+#[inline(never)]
+fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
     let Cow::Owned(input) = input else {
         return Cow::Owned(input.replace('\0', "\u{fffd}"));
     };
+    let first = memchr(0, input.as_bytes()).expect("input contains NUL");
     let nulls = memchr_iter(0, &input.as_bytes()[first..]).count();
     let mut bytes = input.into_bytes();
     let read = bytes.len();
