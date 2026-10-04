@@ -1,0 +1,45 @@
+name: Namespace runners
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: namespace-runners-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Namespace (${{ matrix.arch }})
+    # https://namespace.so/docs/reference/github-actions/runner-configuration
+    runs-on: nscloud-ubuntu-24.04-${{ matrix.arch }}-4x8
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            machine: x86_64
+          - arch: arm64
+            machine: aarch64
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify runner and checkout
+        env:
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+        run: |
+          set -euxo pipefail
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          source /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = 24.04
+          test "$(git rev-parse --is-inside-work-tree)" = true
+          git --version
+          nproc
+          free -h
+          df -h "$RUNNER_TEMP"
