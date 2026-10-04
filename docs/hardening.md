@@ -40,9 +40,10 @@ UTF-8-boundary, or lifetime defect was identified by static review.
 - Run uv's broader index and resolver integration tests with the adapter. The
   31 original HTML tests do not cover all HTTP, caching, URL-resolution, and
   dependency-resolution interactions.
-- Recover the performance margin on small indexes without removing resource
-  checks. The [hardening benchmark](performance.md) measured two small fixtures
-  about 11% slower than astral-tl; four other uv workloads remained faster.
+- Track the remaining system-allocator and long-text costs. The current
+  [benchmarks](performance.md) are faster across all uv fixtures with jemalloc,
+  but a few small fixtures remain slower with the system allocator and the
+  generated 1 MiB text case is slower with both allocators.
 - Continue the scheduled ASan campaigns and retain minimized regressions.
   The 16 KiB fuzz ceiling and short pull-request campaigns leave larger inputs
   and sustained coverage as separate validation work. Processing instructions

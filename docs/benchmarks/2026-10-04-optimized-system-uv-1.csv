@@ -1,0 +1,35 @@
+# astral-html parse and uv field extraction
+# allocator=system samples=31 warmup_ms=50
+case,bytes,links,astral_html_ns,astral_tl_ns,speedup,astral_html_mib_s,astral_html_p10_ns,astral_html_p90_ns,astral_tl_p10_ns,astral_tl_p90_ns
+parse_base,316,1,1223,1370,1.120,246.4,1219,1234,1364,1395
+parse_code_artifact_index_html,777,3,2328,2897,1.244,318.4,2316,2368,2883,2990
+parse_core_metadata,671,5,2566,3346,1.304,249.4,2552,2591,3326,3375
+parse_egg_fragment,215,1,901,1019,1.131,227.6,898,906,1014,1025
+parse_empty_fragment,190,1,899,1011,1.124,201.6,896,913,1005,1023
+parse_empty_href,155,0,799,800,1.001,185.0,793,809,793,913
+parse_encoded_fragment,263,1,903,1119,1.239,277.7,896,928,1111,1142
+parse_escaped_fragment,291,1,954,1183,1.241,291.0,948,982,1177,1194
+parse_file_requires_python_trailing_comma,266,1,1071,1221,1.141,236.9,1063,1080,1218,1226
+parse_flat_index_html,588,2,1325,1704,1.286,423.3,1322,1335,1696,1761
+parse_md5,226,1,897,1026,1.144,240.3,895,901,1022,1031
+parse_missing_hash,189,1,893,959,1.074,201.7,891,897,954,1002
+parse_missing_href,147,0,764,724,0.947,183.4,759,823,721,788
+parse_optional_attributes_case_insensitively,195,1,867,1237,1.427,214.6,863,872,1231,1243
+parse_query_string,204,1,896,980,1.094,217.2,891,998,973,1001
+parse_quoted_filepath,226,1,903,991,1.098,238.8,899,908,983,1002
+parse_sha256,261,1,898,1066,1.187,277.2,895,932,1060,1124
+parse_simple_detail_with_project_status_and_emoji_reason,472,1,1924,1886,0.980,234.0,1912,2125,1875,2075
+parse_simple_detail_with_project_status_and_reason,457,1,1934,1926,0.996,225.3,1924,2070,1919,2018
+parse_simple_detail_with_project_status_no_reason,527,1,1719,1903,1.107,292.3,1709,1902,1893,1947
+parse_simple_detail_with_unknown_project_status,395,1,1727,1673,0.969,218.1,1717,1780,1662,1956
+parse_simple_html_case_insensitively,604,3,2890,3720,1.287,199.3,2868,3045,3695,3843
+parse_simple_html_case_insensitively_2,106,1,677,728,1.076,149.4,675,679,726,731
+parse_simple_index,264,3,1753,1899,1.083,143.6,1725,1836,1862,2189
+parse_simple_index_case_variations,187,3,1279,1492,1.167,139.4,1263,1369,1470,1876
+parse_simple_index_empty_href,130,1,902,884,0.980,137.5,898,926,879,912
+parse_simple_index_empty_text,181,3,1232,1421,1.154,140.1,1228,1279,1415,1501
+parse_simple_index_missing_href,203,2,1354,1483,1.095,143.0,1349,1423,1477,1554
+parse_simple_index_sorted,185,3,1273,1516,1.191,138.6,1269,2536,1508,2968
+parse_unknown_fragment,194,1,899,1023,1.138,205.9,892,1128,1011,1175
+parse_unknown_hash,261,1,897,1114,1.241,277.3,894,915,1107,1128
+reject_invalid_hashes,139,1,659,801,1.214,201.1,656,665,795,816
