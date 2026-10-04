@@ -7,8 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "A read-only HTML parser for package indexes"
 
+[features]
+benchmark-jemalloc = ["dep:tikv-jemallocator"]
+
 [dependencies]
 memchr.workspace = true
+
+[target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
+tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["background_threads_runtime_support"], optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
@@ -17,4 +23,8 @@ html-escape.workspace = true
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "parse"
+harness = false
 
