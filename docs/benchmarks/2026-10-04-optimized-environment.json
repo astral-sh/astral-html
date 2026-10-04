@@ -1,0 +1,324 @@
+{
+  "measured_source_commit": "44066f7152e72d1ec3363cc79d74fa09485e8462",
+  "source_verification": "Every build source hash matches this commit. Builds preceded the commit and retain the checkout HEAD at build time below.",
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0-106-generic",
+    "architecture": "x86_64",
+    "cpu_model": "AMD EPYC-Milan Processor",
+    "measurement_cpu": 24
+  },
+  "profile": {
+    "cargo_profile": "bench",
+    "lto": "thin",
+    "codegen_units": 1,
+    "target_cpu_override": null
+  },
+  "comparison": "astral-html and astral-tl 0.8.0 in the same executable, with the same allocator and common owned extraction of the HTML fields used by uv; output equality checked before each case. This is not an end-to-end uv-client measurement; see docs/performance.md for extraction differences.",
+  "build_environment": {
+    "ohm_experimental_defaults": false,
+    "unset": [
+      "CARGO_UNSTABLE_OHM_PROC_MACRO_TRUST",
+      "CARGO_UNSTABLE_OHM_NATIVE_TOOL_TRUST",
+      "RUSTFLAGS",
+      "CARGO_ENCODED_RUSTFLAGS"
+    ]
+  },
+  "builds": {
+    "system": {
+      "started_utc": "2026-10-04T18:26:09.323808+00:00",
+      "checkout_head": "88fe8a16a7f93242d8ed1ba4b09be01a9ce6f87e",
+      "sources_sha256": {
+        "Cargo.toml": "ca46962cb645e8ca6aa91d95ff61b8fdc119da06e10bcd2a09c3073a71d9a67f",
+        "Cargo.lock": "a8a33fac552ab9bf64bd01aec8863e6ad0cfbf6580209476cf0c9bcb4f2aec3d",
+        "crates/astral-html/Cargo.toml": "6a7f8141b209bccc8d8cf1cc3c2128ea8b7642fe15e3a16acbc912187fb7338a",
+        "crates/astral-html/benches/parse.rs": "f4d8a164d7ba32e938c4d5798b5963a8185fbd85f5229701637e7ccc8454bd0e",
+        "crates/astral-html/tests/support/mod.rs": "35d51e9919fafe5efad2ea6f376c54bb506b995b818fc328356f2a5564971099",
+        "crates/astral-html/src/document.rs": "bbb34760218c36b8115bc6d987d4b3d95f6108137b172e593b5a20942d3ef692",
+        "crates/astral-html/src/entities.rs": "63f09906a0b9f5b9a7823ef3215e6e8a3cf7330225f92f6766e9833d4dd1adba",
+        "crates/astral-html/src/entities_data.rs": "f8a3f91ba04b5d5fdbb4fbd301c85de8452d281b190bf85a20c57524c33dd4e4",
+        "crates/astral-html/src/lib.rs": "09eca50b13dba641e0768dc4c982d95b0264c81550f446be087c6a69b928ef38",
+        "crates/astral-html/src/reader.rs": "b5f6668c770de5f551bbe4b3d35007056c6577ab634650405eb95d66454af560",
+        "crates/astral-html/src/tokenizer.rs": "25bc43847f6bde524729d3cf7222f7ec2fd904b5978e1c0ecb348bc8d1efe7f3"
+      },
+      "build_command": [
+        "cargo",
+        "+ohm",
+        "-Zohm-defaults=no",
+        "bench",
+        "-p",
+        "astral-html",
+        "--bench",
+        "parse",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "rustc": "rustc 1.98.1-dev (f62703110 2026-09-08) (ohm-1.98.1-1)\nbinary: rustc\ncommit-hash: f6270311094cd4b48fefce03debdffcf8396c64c\ncommit-date: 2026-09-08\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1-dev\nLLVM version: 22.1.8\n",
+      "allocator": "system",
+      "experimental_defaults": false,
+      "measurement_cpu": 24,
+      "binary_sha256": "e15c57738c0135109db3b7adf08392aee10820a7b532247f70d335b76e3aa17c",
+      "completed_utc": "2026-10-04T18:26:09.527760+00:00"
+    },
+    "jemalloc": {
+      "started_utc": "2026-10-04T18:26:09.651253+00:00",
+      "checkout_head": "88fe8a16a7f93242d8ed1ba4b09be01a9ce6f87e",
+      "sources_sha256": {
+        "Cargo.toml": "ca46962cb645e8ca6aa91d95ff61b8fdc119da06e10bcd2a09c3073a71d9a67f",
+        "Cargo.lock": "a8a33fac552ab9bf64bd01aec8863e6ad0cfbf6580209476cf0c9bcb4f2aec3d",
+        "crates/astral-html/Cargo.toml": "6a7f8141b209bccc8d8cf1cc3c2128ea8b7642fe15e3a16acbc912187fb7338a",
+        "crates/astral-html/benches/parse.rs": "f4d8a164d7ba32e938c4d5798b5963a8185fbd85f5229701637e7ccc8454bd0e",
+        "crates/astral-html/tests/support/mod.rs": "35d51e9919fafe5efad2ea6f376c54bb506b995b818fc328356f2a5564971099",
+        "crates/astral-html/src/document.rs": "bbb34760218c36b8115bc6d987d4b3d95f6108137b172e593b5a20942d3ef692",
+        "crates/astral-html/src/entities.rs": "63f09906a0b9f5b9a7823ef3215e6e8a3cf7330225f92f6766e9833d4dd1adba",
+        "crates/astral-html/src/entities_data.rs": "f8a3f91ba04b5d5fdbb4fbd301c85de8452d281b190bf85a20c57524c33dd4e4",
+        "crates/astral-html/src/lib.rs": "09eca50b13dba641e0768dc4c982d95b0264c81550f446be087c6a69b928ef38",
+        "crates/astral-html/src/reader.rs": "b5f6668c770de5f551bbe4b3d35007056c6577ab634650405eb95d66454af560",
+        "crates/astral-html/src/tokenizer.rs": "25bc43847f6bde524729d3cf7222f7ec2fd904b5978e1c0ecb348bc8d1efe7f3"
+      },
+      "build_command": [
+        "cargo",
+        "+ohm",
+        "-Zohm-defaults=no",
+        "bench",
+        "-p",
+        "astral-html",
+        "--bench",
+        "parse",
+        "--locked",
+        "--no-run",
+        "--message-format=json",
+        "--features",
+        "benchmark-jemalloc"
+      ],
+      "rustc": "rustc 1.98.1-dev (f62703110 2026-09-08) (ohm-1.98.1-1)\nbinary: rustc\ncommit-hash: f6270311094cd4b48fefce03debdffcf8396c64c\ncommit-date: 2026-09-08\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1-dev\nLLVM version: 22.1.8\n",
+      "allocator": "jemalloc",
+      "experimental_defaults": false,
+      "measurement_cpu": 24,
+      "binary_sha256": "93443edd358c678a3625ed4ffcbd252e52fd257641eb400d91d8510847807890",
+      "completed_utc": "2026-10-04T18:26:14.334957+00:00"
+    }
+  },
+  "fixtures_sha256": {
+    "crates/astral-html/benches/fixtures/iniconfig.html": "470b4150301f29038e0eeea63d4a13fba17e4563c32c2005ef71a99c87196b4b",
+    "crates/astral-html/tests/fixtures/uv/parse_base.html": "0b4df7795ce78af55ed5f67bb8669324cf04f377bc3505e6e840d4d1e030ea89",
+    "crates/astral-html/tests/fixtures/uv/parse_code_artifact_index_html.html": "5929aec808be23c99b1f99a99fd6f4bb74bb439090d7c046643635ed0d420a57",
+    "crates/astral-html/tests/fixtures/uv/parse_core_metadata.html": "dd73232f0e8ce3e2cd70d7cd7318eec91f9beebe837f66df732cf7fb96276fc1",
+    "crates/astral-html/tests/fixtures/uv/parse_egg_fragment.html": "5a0af4e950aca0aa14479dc35e8d1a141f8f217744a55ae022b49eb7b1258967",
+    "crates/astral-html/tests/fixtures/uv/parse_empty_fragment.html": "199b918ea52fbfdf1e0a704777984675a77a030b183d4a90c34820920269de3c",
+    "crates/astral-html/tests/fixtures/uv/parse_empty_href.html": "254d5e57aca09f721f250ec917906e08bb70958d3d44e1251ff2ab6a411c6fd0",
+    "crates/astral-html/tests/fixtures/uv/parse_encoded_fragment.html": "0eb80e8fea3b2d01abf01bafbf130d2d4afa6bc8ba654b596f7d913954e5ef31",
+    "crates/astral-html/tests/fixtures/uv/parse_escaped_fragment.html": "e6f43046e044df280610a013ba4e3f3fcb1681455d4cba9112ecc017ea67aa8b",
+    "crates/astral-html/tests/fixtures/uv/parse_file_requires_python_trailing_comma.html": "f200bbb8d99994cd9801064e8b767d9bb2049f82aa725e69f1e0616c42dbe470",
+    "crates/astral-html/tests/fixtures/uv/parse_flat_index_html.html": "76e07ded201cc42f91b90aed17faa1cc36bb95dfe1013bca44cb06a9ed514034",
+    "crates/astral-html/tests/fixtures/uv/parse_md5.html": "9087034fac3cd850fb7bd3de1159a5b3f85a9753b95078f9ef0b2a47d4bf4bcd",
+    "crates/astral-html/tests/fixtures/uv/parse_missing_hash.html": "b3b8c424271d08244a357450b0df13953b4336fecd352a65426265153b85688f",
+    "crates/astral-html/tests/fixtures/uv/parse_missing_href.html": "ab55e99c04448ba8397f9c60a144c9be53002d1aabfab0e8430adce10ab39ba7",
+    "crates/astral-html/tests/fixtures/uv/parse_optional_attributes_case_insensitively.html": "a00d6ce58121ef2b895ff2e4c6b8820abf9381a6ad0cce2449fefd80ac1a851e",
+    "crates/astral-html/tests/fixtures/uv/parse_query_string.html": "5c34a7df16970a1d4d407dc8d467c075c575607af52a134c265389213c78b6c7",
+    "crates/astral-html/tests/fixtures/uv/parse_quoted_filepath.html": "79476640fbf2cee6e99f3efae5dea5f58938ff7ddff7b7505137c8f17fd7be30",
+    "crates/astral-html/tests/fixtures/uv/parse_sha256.html": "bf3e4c23b9c1230d118a9b9f1edd1a898e0878fe0b6fb216596f5d6de90d51c0",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_detail_with_project_status_and_emoji_reason.html": "0e55f3b5f8f26169587ea70e03f87d1393d3f3b031a736400ec370c40ff6b701",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_detail_with_project_status_and_reason.html": "316e33ab3d5b21a97dc3f2e35d449ffa79a380811692ceb83784684f96e6687f",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_detail_with_project_status_no_reason.html": "d89e0ea4a86608296393e0d2741006a2d873ddf06b9b9c43de73b3673dd4b9d0",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_detail_with_unknown_project_status.html": "c0b9ea9fbff6dcd4bd4f576eb74d7f972d5157a1790f938d58975994eb3715f7",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_html_case_insensitively.html": "82b2f76f0fad4102489a6dccfeeda07cda5e5d7c94d74a4d70d8c2481747d473",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_html_case_insensitively_2.html": "ba634796fcfe54b6745eeb2c96b1eb2dc7c1be2cc2274cb7631ebadda868a29c",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index.html": "91239bf87f6da9acdcf25681a05e6e57860f64e99308445a1840798a90a89cec",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index_case_variations.html": "70bd8d0cbec17fbab155fd3f62bf5e0c3e12252156ca3dddd3d33c462937dfe5",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index_empty_href.html": "c1a87cc65ee7731ca370c3167ce997a7a94bcad46877c6b4ec8fb6ebef8764eb",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index_empty_text.html": "156e4099a07ec635751ee561982f5d7fa07b038d7043207650a52cc3b214ba92",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index_missing_href.html": "b40f43001c74796c911be8d26947e64a2475a8acd27cb82be36e2d0bfc5c6b39",
+    "crates/astral-html/tests/fixtures/uv/parse_simple_index_sorted.html": "67841fe4c4ae56d8c7d1cbc0f452ddb3ce72598f6c0e1ad69229d1bae1126ccc",
+    "crates/astral-html/tests/fixtures/uv/parse_unknown_fragment.html": "8942ad68079c1306461b44ac4c5c5ab0b1f76dbcf8825a22848b70531d72fc0c",
+    "crates/astral-html/tests/fixtures/uv/parse_unknown_hash.html": "1b48bbdf0c70ff27f9ec40f1c888a027b335a8d69d0e1a9e8bb9c4146b36d2a1",
+    "crates/astral-html/tests/fixtures/uv/reject_invalid_hashes.html": "9b00946ab1e29d6e853915eb416be4785a926813de527a0e78f4726ce3137d87"
+  },
+  "runs": [
+    {
+      "allocator": "system",
+      "suite": "default",
+      "repeat": 1,
+      "file": "docs/benchmarks/2026-10-04-optimized-system-default-1.csv",
+      "started_utc": "2026-10-04T18:26:14.588206+00:00",
+      "completed_utc": "2026-10-04T18:26:44.222723+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-system",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "100",
+      "sha256": "d1185ee3273084e2163a9b55ca74f31ef89e65d94e75df12aeaf7feefb6e8235",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "default",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "100"
+      }
+    },
+    {
+      "allocator": "system",
+      "suite": "uv",
+      "repeat": 1,
+      "file": "docs/benchmarks/2026-10-04-optimized-system-uv-1.csv",
+      "started_utc": "2026-10-04T18:26:44.223416+00:00",
+      "completed_utc": "2026-10-04T18:27:31.522634+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-system",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "50",
+      "sha256": "aa64b37172557e888b6cce784d2528264d0f001d7274bc2e8c0935d13c584afa",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "uv",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "50"
+      }
+    },
+    {
+      "allocator": "jemalloc",
+      "suite": "default",
+      "repeat": 1,
+      "file": "docs/benchmarks/2026-10-04-optimized-jemalloc-default-1.csv",
+      "started_utc": "2026-10-04T18:27:31.523606+00:00",
+      "completed_utc": "2026-10-04T18:28:00.823655+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-jemalloc",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "100",
+      "sha256": "8397cef2a735431a5946876d38ce24b624d31e408cd2acc47122a96660921dae",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "default",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "100"
+      }
+    },
+    {
+      "allocator": "jemalloc",
+      "suite": "uv",
+      "repeat": 1,
+      "file": "docs/benchmarks/2026-10-04-optimized-jemalloc-uv-1.csv",
+      "started_utc": "2026-10-04T18:28:00.824247+00:00",
+      "completed_utc": "2026-10-04T18:28:48.425405+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-jemalloc",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "50",
+      "sha256": "ed91f7667011875ed21565b1f7db1c85aed35cb71a75af7e14b4cc998151de5b",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "uv",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "50"
+      }
+    },
+    {
+      "allocator": "system",
+      "suite": "default",
+      "repeat": 2,
+      "file": "docs/benchmarks/2026-10-04-optimized-system-default-2.csv",
+      "started_utc": "2026-10-04T18:28:48.426657+00:00",
+      "completed_utc": "2026-10-04T18:29:17.428327+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-system",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "100",
+      "sha256": "a6570c7386c397febe28347bcaffa33ff2887e6cc5e33924668f51f9a150dfcd",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "default",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "100"
+      }
+    },
+    {
+      "allocator": "system",
+      "suite": "uv",
+      "repeat": 2,
+      "file": "docs/benchmarks/2026-10-04-optimized-system-uv-2.csv",
+      "started_utc": "2026-10-04T18:29:17.429227+00:00",
+      "completed_utc": "2026-10-04T18:30:03.647724+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-system",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "50",
+      "sha256": "ad9714a62afcb4b30f1fd25eb5725639e6a08d7caca213f0ef9fd8ac4498bdc1",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "uv",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "50"
+      }
+    },
+    {
+      "allocator": "jemalloc",
+      "suite": "default",
+      "repeat": 2,
+      "file": "docs/benchmarks/2026-10-04-optimized-jemalloc-default-2.csv",
+      "started_utc": "2026-10-04T18:30:03.649563+00:00",
+      "completed_utc": "2026-10-04T18:30:35.277237+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-jemalloc",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "100",
+      "sha256": "f9738c003e00a97c3b86a8eb50cc09843b9613c6801665333f39ff8e24ffb06d",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "default",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "100"
+      }
+    },
+    {
+      "allocator": "jemalloc",
+      "suite": "uv",
+      "repeat": 2,
+      "file": "docs/benchmarks/2026-10-04-optimized-jemalloc-uv-2.csv",
+      "started_utc": "2026-10-04T18:30:35.279311+00:00",
+      "completed_utc": "2026-10-04T18:31:23.045373+00:00",
+      "command": [
+        "taskset",
+        "-c",
+        "24",
+        "/tmp/astral-html-optimized-jemalloc",
+        "--bench"
+      ],
+      "samples": 31,
+      "sample_ms": "50",
+      "sha256": "6c2c74bc523c8f8f2298ecaead6588df6ba0f07681b39be075eecea1d5ff8c0f",
+      "environment": {
+        "ASTRAL_HTML_BENCH_SUITE": "uv",
+        "ASTRAL_HTML_BENCH_SAMPLES": "31",
+        "ASTRAL_HTML_BENCH_SAMPLE_MS": "50"
+      }
+    }
+  ]
+}

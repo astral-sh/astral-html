@@ -9,16 +9,28 @@ use crate::entities_data::NAMED;
 /// In attribute mode, NUL becomes U+FFFD and semicolonless named references are left
 /// intact before ASCII letters, digits, or `=`. Unchanged input is borrowed.
 /// References are decoded once: `&amp;lt;` becomes `&lt;`.
+#[inline]
 pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
     let bytes = input.as_bytes();
-    let first = if attribute {
+    let first = if bytes.len() < 16 {
+        bytes
+            .iter()
+            .position(|&byte| matches!(byte, b'&' | b'\r') || (attribute && byte == 0))
+    } else if attribute {
         memchr::memchr3(b'&', b'\r', 0, bytes)
     } else {
         memchr::memchr2(b'&', b'\r', bytes)
     };
-    let Some(mut cursor) = first else {
+    let Some(first) = first else {
         return Cow::Borrowed(input);
     };
+    decode_from(input, attribute, first)
+}
+
+/// Start at an ASCII marker from the initial scan; preceding bytes need no transformation.
+#[inline(never)]
+fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> {
+    let bytes = input.as_bytes();
     let mut output = None;
     let mut unchanged = 0;
     while cursor < bytes.len() {

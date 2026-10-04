@@ -1,6 +1,7 @@
 //! HTML text-state selection for source-order readers.
 
-use crate::{Error, State, Token, Tokenizer};
+use crate::tokenizer::AttributeBudget;
+use crate::{Attribute, State, Token, Tokenizer};
 
 /// A source-order HTML event reader that selects text modes from start tags.
 ///
@@ -35,16 +36,18 @@ impl<'a> Reader<'a> {
 
     /// Read a token while charging parsed attributes to a document's budget.
     ///
-    /// Incomplete tags consume budget even when EOF discards them. The caller
-    /// must stop on an error; the tokenizer has not finished the current tag.
+    /// Incomplete tags consume budget even when EOF discards them. Exhaustion
+    /// returns `None`; the caller must check the budget after the token loop.
+    /// The attribute buffer must be empty; returned tags may take ownership of it.
     pub(crate) fn next_with_attribute_budget(
         &mut self,
-        remaining_attributes: &mut usize,
-    ) -> Option<Result<Token<'a>, Error>> {
+        budget: &mut AttributeBudget,
+        attribute_buffer: &mut Vec<Attribute<'a>>,
+    ) -> Option<Token<'a>> {
         let token = self
             .tokenizer
-            .next_with_attribute_budget(remaining_attributes)?;
-        if let Ok(Token::StartTag(tag)) = &token {
+            .next_with_attribute_budget(budget, attribute_buffer);
+        if let Some(Token::StartTag(tag)) = &token {
             let state = match tag.name.as_ref() {
                 "title" | "textarea" => Some(State::Rcdata),
                 "style" | "xmp" | "iframe" | "noembed" | "noframes" => Some(State::Rawtext),
@@ -56,7 +59,7 @@ impl<'a> Reader<'a> {
                 self.tokenizer.set_state(state, Some(&tag.name));
             }
         }
-        Some(token)
+        token
     }
 }
 
@@ -64,9 +67,7 @@ impl<'a> Iterator for Reader<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut remaining_attributes = usize::MAX;
-        self.next_with_attribute_budget(&mut remaining_attributes)
-            .map(|token| token.expect("an unbounded reader cannot exhaust its attribute budget"))
+        self.next_with_attribute_budget(&mut AttributeBudget::new(usize::MAX), &mut Vec::new())
     }
 }
 
