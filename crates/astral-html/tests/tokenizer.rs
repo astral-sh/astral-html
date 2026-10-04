@@ -221,3 +221,56 @@ fn text_modes_only_recognize_ascii_letter_end_tag_names() {
         assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
     }
 }
+
+#[test]
+fn long_comments_preserve_text_around_state_transitions() {
+    let run = "é🦀".repeat(64);
+    let source = format!("<!--{run}-->");
+    assert!(matches!(
+        Tokenizer::new(&source).next(),
+        Some(Token::Comment(Cow::Borrowed(comment))) if comment == run
+    ));
+    for (suffix, normalized) in [
+        ("\r\nx", "\nx"),
+        ("\0x", "�x"),
+        ("-x", "-x"),
+        ("<x", "<x"),
+        (">x", ">x"),
+    ] {
+        let source = format!("<!--{run}{suffix}-->");
+        assert_eq!(
+            Tokenizer::new(&source).next(),
+            Some(Token::Comment(Cow::Owned(format!("{run}{normalized}"))))
+        );
+    }
+    let text = format!("{run}\r\n-{run}<x\0{run}\r{run}");
+    let expected = format!("{run}\n-{run}<x�{run}\n{run}");
+    for ending in ["-->", ""] {
+        let source = format!("<!--{text}{ending}");
+        let mut tokenizer = Tokenizer::new(&source);
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Comment(Cow::Borrowed(&expected)))
+        );
+        assert_eq!(tokenizer.position(), source.len());
+        assert_eq!(tokenizer.next(), None);
+    }
+}
+
+#[test]
+fn long_script_runs_preserve_escape_transitions() {
+    let run = "é🦀\r\n\0".repeat(64);
+    let text =
+        format!("{run}<!--{run}-x{run}--x{run}<script>{run}-x{run}--x{run}</script>{run}-->{run}");
+    let expected = text.replace("\r\n", "\n").replace('\0', "�");
+    let source = format!("{text}</script>after");
+    let mut tokenizer = Tokenizer::with_state(&source, State::ScriptData, Some("script"));
+    assert_eq!(
+        tokenizer.next(),
+        Some(Token::Text(Cow::Borrowed(&expected)))
+    );
+    assert_eq!(tokenizer.position(), text.len());
+    assert!(matches!(tokenizer.next(), Some(Token::EndTag(tag)) if tag.name == "script"));
+    assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
+    assert_eq!(tokenizer.next(), None);
+}

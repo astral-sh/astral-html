@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::FusedIterator;
 
-use memchr::{memchr, memchr_iter, memchr3};
+use memchr::{memchr, memchr_iter, memchr2, memchr3};
 
 use crate::entities::{decode, normalize};
 
@@ -318,10 +318,9 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn comment(&mut self) -> Token<'a> {
         let rest = &self.source[self.position..];
-        if let Some(end) = rest
-            .bytes()
-            .position(|byte| matches!(byte, b'-' | b'<' | b'\r' | 0 | b'>'))
+        if let Some(end) = memchr3(b'-', b'<', b'>', rest.as_bytes())
             && rest[end..].starts_with("-->")
+            && memchr2(b'\r', 0, &rest.as_bytes()[..end]).is_none()
         {
             self.position += end + 3;
             return Token::Comment(Cow::Borrowed(&rest[..end]));
@@ -385,7 +384,20 @@ impl<'a> Tokenizer<'a> {
                     }
                     '-' => state = CommentState::EndDash,
                     '\0' => data.push('\u{fffd}'),
-                    _ => data.push(ch),
+                    '\n' => data.push('\n'),
+                    _ => {
+                        let rest = &self.source[self.position..];
+                        let end = memchr3(b'<', b'-', b'\r', rest.as_bytes()).unwrap_or(rest.len());
+                        let mut start = 0;
+                        for nul in memchr_iter(0, &rest.as_bytes()[..end]) {
+                            data.push_str(&rest[start..nul]);
+                            data.push('\u{fffd}');
+                            start = nul + 1;
+                        }
+                        data.push_str(&rest[start..end]);
+                        self.position += end;
+                        continue;
+                    }
                 },
                 CommentState::Less => match ch {
                     '!' => {
@@ -627,6 +639,15 @@ impl<'a> Tokenizer<'a> {
         let mut at = start;
         let mut state = Script::Data;
         while at < bytes.len() {
+            let offset = match state {
+                Script::Data => memchr(b'<', &bytes[at..]),
+                Script::Escaped | Script::Double => memchr2(b'<', b'-', &bytes[at..]),
+                _ => Some(0),
+            };
+            let Some(offset) = offset else {
+                return bytes.len();
+            };
+            at += offset;
             let byte = bytes[at];
             match state {
                 Script::Data => {
