@@ -1,0 +1,195 @@
+//! HTML character references and input newline normalization.
+
+use std::borrow::Cow;
+
+use crate::entities_data::NAMED;
+
+/// Decode HTML character references, normalizing CRLF and CR to LF.
+///
+/// Set `attribute` for attribute values: legacy references without a semicolon
+/// are not consumed before an ASCII alphanumeric character or `=`, and literal
+/// NUL characters become U+FFFD. The returned string borrows `input` when no
+/// transformation is needed. Decoding is a single pass: `&amp;lt;` becomes `&lt;`.
+pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
+    let bytes = input.as_bytes();
+    let first = if attribute {
+        memchr::memchr3(b'&', b'\r', 0, bytes)
+    } else {
+        memchr::memchr2(b'&', b'\r', bytes)
+    };
+    let Some(mut cursor) = first else {
+        return Cow::Borrowed(input);
+    };
+    let mut output = String::with_capacity(input.len());
+    output.push_str(&input[..cursor]);
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'&' => {
+                if let Some((consumed, replacement)) = reference(&input[cursor + 1..], attribute) {
+                    match replacement {
+                        Replacement::Character(character) => output.push(character),
+                        Replacement::Named(text) => output.push_str(text),
+                    }
+                    cursor += consumed + 1;
+                } else {
+                    output.push('&');
+                    cursor += 1;
+                }
+            }
+            b'\r' => {
+                output.push('\n');
+                cursor += 1 + usize::from(bytes.get(cursor + 1) == Some(&b'\n'));
+            }
+            0 if attribute => {
+                output.push('\u{fffd}');
+                cursor += 1;
+            }
+            _ => {
+                let end = if attribute {
+                    memchr::memchr3(b'&', b'\r', 0, &bytes[cursor..])
+                } else {
+                    memchr::memchr2(b'&', b'\r', &bytes[cursor..])
+                }
+                .map_or(bytes.len(), |offset| cursor + offset);
+                output.push_str(&input[cursor..end]);
+                cursor = end;
+            }
+        }
+    }
+    Cow::Owned(output)
+}
+
+/// Normalize HTML input newlines, leaving character references and NUL intact.
+pub fn normalize(input: &str) -> Cow<'_, str> {
+    let Some(first) = memchr::memchr(b'\r', input.as_bytes()) else {
+        return Cow::Borrowed(input);
+    };
+    let mut output = String::with_capacity(input.len());
+    output.push_str(&input[..first]);
+    let mut rest = &input[first..];
+    while let Some(offset) = memchr::memchr(b'\r', rest.as_bytes()) {
+        output.push_str(&rest[..offset]);
+        output.push('\n');
+        rest = &rest[offset + 1..];
+        if let Some(suffix) = rest.strip_prefix('\n') {
+            rest = suffix;
+        }
+    }
+    output.push_str(rest);
+    Cow::Owned(output)
+}
+
+enum Replacement {
+    Character(char),
+    Named(&'static str),
+}
+
+/// Read a reference after its leading ampersand, with bounded named lookahead.
+fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
+    let bytes = input.as_bytes();
+    if bytes.first() == Some(&b'#') {
+        let hex = matches!(bytes.get(1), Some(b'x' | b'X'));
+        let start = if hex { 2 } else { 1 };
+        let radix = if hex { 16 } else { 10 };
+        let mut end = start;
+        let mut number = 0u32;
+        while let Some(digit) = bytes
+            .get(end)
+            .and_then(|byte| char::from(*byte).to_digit(radix))
+        {
+            number = number.saturating_mul(radix).saturating_add(digit);
+            end += 1;
+        }
+        if end == start {
+            return None;
+        }
+        if bytes.get(end) == Some(&b';') {
+            end += 1;
+        }
+        return Some((end, Replacement::Character(numeric(number))));
+    }
+
+    // The longest WHATWG name is 32 ASCII bytes, including its semicolon.
+    // Bounding this scan also bounds work for arbitrarily long unknown names.
+    let mut end = 0;
+    while end < 32 && bytes.get(end).is_some_and(u8::is_ascii_alphanumeric) {
+        end += 1;
+    }
+    if end < 32 && bytes.get(end) == Some(&b';') {
+        end += 1;
+    }
+    for length in (1..=end).rev() {
+        let candidate = &input[..length];
+        if let Ok(index) = NAMED.binary_search_by_key(&candidate, |(name, _)| *name) {
+            if !candidate.ends_with(';')
+                && attribute
+                && bytes
+                    .get(length)
+                    .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'=')
+            {
+                return None;
+            }
+            return Some((length, Replacement::Named(NAMED[index].1)));
+        }
+    }
+    None
+}
+
+/// Apply the numeric reference replacement rules, including Windows-1252.
+fn numeric(number: u32) -> char {
+    const C1: [u32; 32] = [
+        0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030, 0x160, 0x2039,
+        0x152, 0x8d, 0x17d, 0x8f, 0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
+        0x2dc, 0x2122, 0x161, 0x203a, 0x153, 0x9d, 0x17e, 0x178,
+    ];
+    let number = match number {
+        0 => 0xfffd,
+        0x80..=0x9f => C1[(number - 0x80) as usize],
+        number => number,
+    };
+    char::from_u32(number).unwrap_or('\u{fffd}')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn named_references_follow_attribute_context() {
+        assert_eq!(
+            decode("&notit; &amp=1 &AMP; &NotEqualTilde;", false),
+            "¬it; &=1 & ≂\u{338}"
+        );
+        assert_eq!(
+            decode("&notit; &amp=1 &AMP; &NotEqualTilde;", true),
+            "&notit; &amp=1 & ≂\u{338}"
+        );
+        assert_eq!(decode("&amp;lt;", true), "&lt;");
+    }
+
+    #[test]
+    fn numeric_references_replace_invalid_scalars() {
+        assert_eq!(
+            decode("&#0; &#xD800; &#1114112; &#128; &#x1F980;", false),
+            "� � � € 🦀"
+        );
+        assert_eq!(decode("&#999999999999999999999999;", true), "�");
+        assert_eq!(decode("&#x; &#; &#65=", true), "&#x; &#; A=");
+    }
+
+    #[test]
+    fn newlines_and_null_are_contextual() {
+        assert_eq!(decode("a\r\nb\rc\0", true), "a\nb\nc�");
+        assert_eq!(decode("a\r\nb\rc\0", false), "a\nb\nc\0");
+        assert_eq!(normalize("\r\n\r&copy;\0"), "\n\n&copy;\0");
+        assert!(matches!(decode("plain 🦀 text", true), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn every_named_reference_decodes() {
+        assert_eq!(NAMED.len(), 2231);
+        for &(name, expected) in NAMED {
+            assert_eq!(decode(&format!("&{name}"), false), expected, "{name}");
+        }
+    }
+}
