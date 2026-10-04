@@ -3,8 +3,10 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::Range;
 
-use crate::{Attribute, Reader, Tag, Token};
+use crate::tokenizer::AttributeBudget;
+use crate::{Attribute, Reader, Token};
 
 /// Resource limits for constructing a document.
 ///
@@ -74,6 +76,7 @@ impl std::error::Error for Error {}
 /// Construction, traversal, and destruction use flat storage without recursion.
 pub struct Document<'a> {
     nodes: Vec<Node<'a>>,
+    attributes: Vec<Attribute<'a>>,
 }
 
 struct Node<'a> {
@@ -84,8 +87,13 @@ struct Node<'a> {
 }
 
 enum Kind<'a> {
-    Element(Tag<'a>),
+    Element(ElementData<'a>),
     Text(Cow<'a, str>),
+}
+
+struct ElementData<'a> {
+    name: Cow<'a, str>,
+    attributes: Range<usize>,
 }
 
 struct Open {
@@ -109,16 +117,22 @@ impl<'a> Document<'a> {
         if source.len() > limits.max_input_bytes {
             return Err(Error::InputLimit);
         }
-        let mut document = Self { nodes: Vec::new() };
+        let mut document = Self {
+            nodes: Vec::with_capacity(source.len().min(limits.max_nodes).min(16)),
+            attributes: Vec::new(),
+        };
         let mut open: Vec<Open> = Vec::new();
         // Small stacks need no name index. Promote deeper documents once, so
         // unmatched end tags cannot repeatedly scan an unbounded open stack.
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
         let mut reader = Reader::new(source);
-        let mut remaining_attributes = limits.max_attributes;
-        while let Some(token) = reader.next_with_attribute_budget(&mut remaining_attributes) {
-            match token? {
-                Token::StartTag(tag) => {
+        let mut budget = AttributeBudget::new(limits.max_attributes);
+        let mut attribute_buffer = Vec::new();
+        while let Some(token) =
+            reader.next_with_attribute_budget(&mut budget, &mut attribute_buffer)
+        {
+            let mut attributes = match token {
+                Token::StartTag(mut tag) => {
                     let is_void = is_void(&tag.name);
                     if !is_void && open.len() >= limits.max_depth {
                         return Err(Error::DepthLimit);
@@ -147,11 +161,21 @@ impl<'a> Document<'a> {
                             previous,
                         });
                     }
+                    let start = document.attributes.len();
+                    if document.attributes.is_empty() {
+                        std::mem::swap(&mut document.attributes, &mut tag.attributes);
+                    } else {
+                        document.attributes.append(&mut tag.attributes);
+                    }
                     document.nodes.push(Node {
-                        kind: Kind::Element(tag),
+                        kind: Kind::Element(ElementData {
+                            name: tag.name,
+                            attributes: start..document.attributes.len(),
+                        }),
                         parent,
                         end: index + 1,
                     });
+                    tag.attributes
                 }
                 Token::EndTag(tag) => {
                     let depth = if let Some(names) = &names {
@@ -164,6 +188,7 @@ impl<'a> Document<'a> {
                     if let Some(depth) = depth {
                         document.close(&mut open, &mut names, depth);
                     }
+                    tag.attributes
                 }
                 Token::Text(text) => {
                     if !text.is_empty() {
@@ -177,10 +202,18 @@ impl<'a> Document<'a> {
                             end: index + 1,
                         });
                     }
+                    continue;
                 }
-                Token::Comment(_) | Token::Doctype(_) | Token::ProcessingInstruction { .. } => {}
+                Token::Comment(_) | Token::Doctype(_) | Token::ProcessingInstruction { .. } => {
+                    continue;
+                }
+            };
+            attributes.clear();
+            if attributes.capacity() > attribute_buffer.capacity() {
+                attribute_buffer = attributes;
             }
         }
+        budget.check()?;
         document.close(&mut open, &mut names, 0);
         Ok(document)
     }
@@ -235,7 +268,7 @@ pub struct Element<'doc, 'src> {
 }
 
 impl<'doc, 'src> Element<'doc, 'src> {
-    fn tag(self) -> &'doc Tag<'src> {
+    fn data(self) -> &'doc ElementData<'src> {
         let Kind::Element(tag) = &self.document.nodes[self.index].kind else {
             unreachable!()
         };
@@ -244,23 +277,23 @@ impl<'doc, 'src> Element<'doc, 'src> {
 
     /// Return the normalized name, with ASCII letters lowercased.
     pub fn name(self) -> &'doc str {
-        &self.tag().name
+        &self.data().name
     }
 
     /// Compare an HTML element name without ASCII case sensitivity.
     pub fn is(self, name: &str) -> bool {
-        self.name().eq_ignore_ascii_case(name)
+        let actual = self.name();
+        actual == name || actual.eq_ignore_ascii_case(name)
     }
 
     /// Find an attribute without ASCII case sensitivity. The first occurrence wins.
     ///
     /// Values are already decoded; [`Attribute::raw_value`] preserves their
     /// source spelling.
+    #[inline]
     pub fn attribute(self, name: &str) -> Option<&'doc Attribute<'src>> {
-        self.tag()
-            .attributes
-            .iter()
-            .find(|attribute| attribute.name.eq_ignore_ascii_case(name))
+        self.attributes()
+            .find(|attribute| attribute.name == name || attribute.name.eq_ignore_ascii_case(name))
     }
 
     /// Test for an attribute, including a boolean attribute with no value.
@@ -270,7 +303,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
 
     /// Iterate over the element's attributes in source order, without duplicates.
     pub fn attributes(self) -> impl Iterator<Item = &'doc Attribute<'src>> {
-        self.tag().attributes.iter()
+        self.document.attributes[self.data().attributes.clone()].iter()
     }
 
     /// Return the containing lexical element, or `None` for a root element.
@@ -313,6 +346,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
     /// remain literal in script/style contents. No layout whitespace is inserted.
     /// A single segment borrows from the document; multiple segments allocate.
     /// With no text, this returns a borrowed empty string.
+    #[inline]
     pub fn text(self) -> Cow<'doc, str> {
         let end = self.document.nodes[self.index].end;
         let mut segments = self.document.nodes[self.index + 1..end]
@@ -330,14 +364,24 @@ impl<'doc, 'src> Element<'doc, 'src> {
         let Some(second) = segments.next() else {
             return Cow::Borrowed(first);
         };
-        let mut text = String::with_capacity(first.len() + second.len());
-        text.push_str(first);
-        text.push_str(second);
-        for segment in segments {
-            text.push_str(segment);
-        }
-        Cow::Owned(text)
+        Cow::Owned(concatenate_text(first, second, segments))
     }
+}
+
+/// Allocate only after a second text segment rules out a borrowed result.
+#[inline(never)]
+fn concatenate_text<'a>(
+    first: &str,
+    second: &str,
+    remaining: impl Iterator<Item = &'a str>,
+) -> String {
+    let mut text = String::with_capacity(first.len() + second.len());
+    text.push_str(first);
+    text.push_str(second);
+    for segment in remaining {
+        text.push_str(segment);
+    }
+    text
 }
 
 impl fmt::Debug for Element<'_, '_> {

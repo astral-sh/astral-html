@@ -77,6 +77,8 @@ pub struct Doctype<'a> {
 
 /// An HTML token. Adjacent text tokens may be emitted separately.
 #[derive(Debug, Clone, Eq, PartialEq)]
+// Avoid niche-based discriminant decoding in the token loop.
+#[repr(u8)]
 pub enum Token<'a> {
     /// An opening tag.
     StartTag(Tag<'a>),
@@ -97,6 +99,39 @@ pub enum Token<'a> {
     },
 }
 
+/// Stops tokenization when exhausted. Check the result after the token loop.
+pub(crate) struct AttributeBudget {
+    remaining: usize,
+    exceeded: bool,
+}
+
+impl AttributeBudget {
+    pub(crate) fn new(remaining: usize) -> Self {
+        Self {
+            remaining,
+            exceeded: false,
+        }
+    }
+
+    fn consume(&mut self) -> Option<()> {
+        if self.remaining == 0 {
+            self.exceeded = true;
+            None
+        } else {
+            self.remaining -= 1;
+            Some(())
+        }
+    }
+
+    pub(crate) fn check(&self) -> Result<(), crate::Error> {
+        if self.exceeded {
+            Err(crate::Error::AttributeLimit)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// An HTML tokenizer over borrowed UTF-8 input.
 ///
 /// Tree construction is left to the caller, which selects text modes with
@@ -106,7 +141,7 @@ pub struct Tokenizer<'a> {
     source: &'a str,
     position: usize,
     state: State,
-    last_start_tag: Option<Cow<'a, str>>,
+    last_start_tag: Option<String>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -128,7 +163,7 @@ impl<'a> Tokenizer<'a> {
             state,
             last_start_tag: last_start_tag
                 .filter(|name| can_end_text(name))
-                .map(|name| Cow::Owned(name.to_ascii_lowercase())),
+                .map(str::to_ascii_lowercase),
         }
     }
 
@@ -137,7 +172,7 @@ impl<'a> Tokenizer<'a> {
         self.state = state;
         self.last_start_tag = last_start_tag
             .filter(|name| can_end_text(name))
-            .map(|name| Cow::Owned(name.to_ascii_lowercase()));
+            .map(str::to_ascii_lowercase);
     }
 
     /// Return the byte offset of the next unread source character.
@@ -172,21 +207,68 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Parse a tag, discarding it if EOF arrives before `>`.
+    #[inline(always)]
     fn tag(
         &mut self,
         end: bool,
-        remaining_attributes: &mut usize,
-    ) -> Option<Result<Token<'a>, crate::Error>> {
+        budget: &mut AttributeBudget,
+        attribute_buffer: &mut Vec<Attribute<'a>>,
+    ) -> Option<Token<'a>> {
         self.position += if end { 2 } else { 1 };
-        let name_start = self.position;
-        while self
-            .current()
-            .is_some_and(|byte| !is_space(byte) && !matches!(byte, b'/' | b'>'))
-        {
+        let name = self.name(false);
+        let (attributes, self_closing) = if self.current() == Some(b'>') {
             self.position += 1;
+            (Vec::new(), false)
+        } else if self.source.as_bytes()[self.position..].starts_with(b"/>") {
+            self.position += 2;
+            (Vec::new(), true)
+        } else {
+            self.attributes(budget, attribute_buffer)?
+        };
+        let tag = Tag {
+            name,
+            attributes,
+            self_closing,
+        };
+        Some(if end {
+            Token::EndTag(tag)
+        } else {
+            Token::StartTag(tag)
+        })
+    }
+
+    /// Scan and normalize a name, borrowing unchanged spelling.
+    /// The first byte is part of the name, including `=` in attribute names.
+    #[inline(always)]
+    fn name(&mut self, attribute: bool) -> Cow<'a, str> {
+        let start = self.position;
+        let bytes = self.source.as_bytes();
+        let mut end = start + 1;
+        let mut needs_normalization = bytes[start].is_ascii_uppercase() || bytes[start] == 0;
+        while let Some(&byte) = bytes.get(end) {
+            if is_space(byte) || matches!(byte, b'/' | b'>') || (attribute && byte == b'=') {
+                break;
+            }
+            needs_normalization |= byte.is_ascii_uppercase() || byte == 0;
+            end += 1;
         }
-        let name = normalize_name(&self.source[name_start..self.position]);
-        let mut attributes = Vec::<Attribute<'a>>::new();
+        self.position = end;
+        let name = &self.source[start..end];
+        if needs_normalization {
+            normalize_name(name)
+        } else {
+            Cow::Borrowed(name)
+        }
+    }
+
+    /// Read attributes through the closing delimiter, including the self-closing flag.
+    #[inline(never)]
+    fn attributes(
+        &mut self,
+        budget: &mut AttributeBudget,
+        attribute_buffer: &mut Vec<Attribute<'a>>,
+    ) -> Option<(Vec<Attribute<'a>>, bool)> {
+        let mut attributes = std::mem::take(attribute_buffer);
         let mut seen: Option<HashSet<Cow<'a, str>>> = None;
         let mut self_closing = false;
         loop {
@@ -207,20 +289,8 @@ impl<'a> Tokenizer<'a> {
                 }
                 _ => {}
             }
-            if *remaining_attributes == 0 {
-                return Some(Err(crate::Error::AttributeLimit));
-            }
-            *remaining_attributes -= 1;
-            let start = self.position;
-            // An equals sign can be the first character of an attribute name.
-            self.position += 1;
-            while self
-                .current()
-                .is_some_and(|byte| !is_space(byte) && !matches!(byte, b'/' | b'>' | b'='))
-            {
-                self.position += 1;
-            }
-            let attr_name = normalize_name(&self.source[start..self.position]);
+            budget.consume()?;
+            let attr_name = self.name(true);
             self.whitespace();
             let raw_value = if self.current() == Some(b'=') {
                 self.position += 1;
@@ -271,17 +341,7 @@ impl<'a> Tokenizer<'a> {
                 });
             }
         }
-        let tag = Tag {
-            name,
-            attributes,
-            self_closing,
-        };
-        if end {
-            Some(Ok(Token::EndTag(tag)))
-        } else {
-            self.last_start_tag = can_end_text(&tag.name).then(|| tag.name.clone());
-            Some(Ok(Token::StartTag(tag)))
-        }
+        Some((attributes, self_closing))
     }
 
     fn bogus_comment(&mut self, start: usize) -> Token<'a> {
@@ -295,7 +355,23 @@ impl<'a> Tokenizer<'a> {
         result
     }
 
+    #[inline]
     fn comment(&mut self) -> Token<'a> {
+        let rest = &self.source[self.position..];
+        if let Some(end) = rest
+            .bytes()
+            .position(|byte| matches!(byte, b'-' | b'<' | b'\r' | 0 | b'>'))
+            && rest[end..].starts_with("-->")
+        {
+            self.position += end + 3;
+            return Token::Comment(Cow::Borrowed(&rest[..end]));
+        }
+        self.comment_slow()
+    }
+
+    /// Handle comment-state transitions and text normalization.
+    #[inline(never)]
+    fn comment_slow(&mut self) -> Token<'a> {
         #[derive(Clone, Copy)]
         enum CommentState {
             Start,
@@ -456,6 +532,7 @@ impl<'a> Tokenizer<'a> {
         Token::Doctype(doctype)
     }
 
+    #[inline(never)]
     fn doctype(&mut self) -> Token<'a> {
         let mut doctype = Doctype {
             name: None,
@@ -534,6 +611,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Recover invalid targets as bogus comments; discard unfinished instructions at EOF.
+    #[inline(never)]
     fn processing_instruction(&mut self) -> Option<Token<'a>> {
         let comment_start = self.position + 1;
         self.position += 2;
@@ -572,6 +650,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Find an appropriate end tag outside double-escaped content, or return EOF.
+    #[inline(never)]
     fn script_end(&self, start: usize) -> usize {
         #[derive(Clone, Copy)]
         enum Script {
@@ -673,20 +752,21 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Count each attribute before allocating its name or value.
-    /// Duplicates and end-tag attributes count. Callers must stop after a limit error.
+    /// Duplicates and end-tag attributes count. Exhaustion returns `None`; callers
+    /// must check the budget after the token loop and must not resume tokenization.
+    /// The attribute buffer must be empty; returned tags may take ownership of it.
     pub(crate) fn next_with_attribute_budget(
         &mut self,
-        remaining_attributes: &mut usize,
-    ) -> Option<Result<Token<'a>, crate::Error>> {
+        budget: &mut AttributeBudget,
+        attribute_buffer: &mut Vec<Attribute<'a>>,
+    ) -> Option<Token<'a>> {
         loop {
             self.current()?;
             let start = self.position;
             match self.state {
                 State::Plaintext => {
                     self.position = self.source.len();
-                    return Some(Ok(Token::Text(replace_null(normalize(
-                        &self.source[start..],
-                    )))));
+                    return Some(Token::Text(replace_null(normalize(&self.source[start..]))));
                 }
                 State::Cdata => {
                     let rest = &self.source[start..];
@@ -694,23 +774,29 @@ impl<'a> Tokenizer<'a> {
                     self.position = (end + 3).min(self.source.len());
                     self.state = State::Data;
                     if end > start {
-                        return Some(Ok(Token::Text(normalize(&self.source[start..end]))));
+                        return Some(Token::Text(normalize(&self.source[start..end])));
                     }
                     continue;
                 }
                 State::Rcdata | State::Rawtext | State::ScriptData => {
                     if self.appropriate_end(start) {
                         self.state = State::Data;
-                        return self.tag(true, remaining_attributes);
+                        return self.tag(true, budget, attribute_buffer);
                     }
                     let end = if self.state == State::ScriptData {
                         self.script_end(start)
                     } else {
                         let mut end = start;
-                        while end < self.source.len() && !self.appropriate_end(end) {
+                        loop {
+                            let Some(offset) = memchr(b'<', &self.source.as_bytes()[end..]) else {
+                                break self.source.len();
+                            };
+                            end += offset;
+                            if self.appropriate_end(end) {
+                                break end;
+                            }
                             end += 1;
                         }
-                        end
                     };
                     self.position = end;
                     let text = if self.state == State::Rcdata {
@@ -718,34 +804,39 @@ impl<'a> Tokenizer<'a> {
                     } else {
                         normalize(&self.source[start..end])
                     };
-                    return Some(Ok(Token::Text(replace_null(text))));
+                    return Some(Token::Text(replace_null(text)));
                 }
                 State::Data => {}
             }
             if self.current() != Some(b'<') {
                 let rest = &self.source.as_bytes()[start..];
-                let first = memchr3(b'<', b'&', b'\r', rest).unwrap_or(rest.len());
+                let prefix = rest.len().min(16);
+                let first = rest[..prefix]
+                    .iter()
+                    .position(|byte| matches!(byte, b'<' | b'&' | b'\r'))
+                    .or_else(|| memchr3(b'<', b'&', b'\r', &rest[prefix..]).map(|at| prefix + at))
+                    .unwrap_or(rest.len());
                 if first == rest.len() || rest[first] == b'<' {
                     self.position += first;
-                    return Some(Ok(Token::Text(Cow::Borrowed(
+                    return Some(Token::Text(Cow::Borrowed(
                         &self.source[start..self.position],
-                    ))));
+                    )));
                 }
                 self.position = memchr(b'<', &rest[first..])
                     .map_or(self.source.len(), |offset| start + first + offset);
-                return Some(Ok(Token::Text(decode(
+                return Some(Token::Text(decode(
                     &self.source[start..self.position],
                     false,
-                ))));
+                )));
             }
             let rest = &self.source.as_bytes()[start..];
             match rest.get(1).copied() {
                 Some(byte) if byte.is_ascii_alphabetic() => {
-                    return self.tag(false, remaining_attributes);
+                    return self.tag(false, budget, attribute_buffer);
                 }
                 Some(b'/') => match rest.get(2).copied() {
                     Some(byte) if byte.is_ascii_alphabetic() => {
-                        return self.tag(true, remaining_attributes);
+                        return self.tag(true, budget, attribute_buffer);
                     }
                     Some(b'>') => {
                         self.position += 3;
@@ -753,32 +844,32 @@ impl<'a> Tokenizer<'a> {
                     }
                     None => {
                         self.position += 2;
-                        return Some(Ok(Token::Text(Cow::Borrowed("</"))));
+                        return Some(Token::Text(Cow::Borrowed("</")));
                     }
                     _ => {
                         self.position += 2;
-                        return Some(Ok(self.bogus_comment(start + 2)));
+                        return Some(self.bogus_comment(start + 2));
                     }
                 },
                 Some(b'!') => {
                     self.position += 2;
                     if rest.starts_with(b"<!--") {
                         self.position += 2;
-                        return Some(Ok(self.comment()));
+                        return Some(self.comment());
                     }
                     if rest
                         .get(2..9)
                         .is_some_and(|keyword| keyword.eq_ignore_ascii_case(b"DOCTYPE"))
                     {
                         self.position += 7;
-                        return Some(Ok(self.doctype()));
+                        return Some(self.doctype());
                     }
-                    return Some(Ok(self.bogus_comment(start + 2)));
+                    return Some(self.bogus_comment(start + 2));
                 }
-                Some(b'?') => return self.processing_instruction().map(Ok),
+                Some(b'?') => return self.processing_instruction(),
                 _ => {
                     self.position += 1;
-                    return Some(Ok(Token::Text(Cow::Borrowed("<"))));
+                    return Some(Token::Text(Cow::Borrowed("<")));
                 }
             }
         }
@@ -789,9 +880,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut remaining_attributes = usize::MAX;
-        self.next_with_attribute_budget(&mut remaining_attributes)
-            .map(|token| token.expect("an unbounded tokenizer cannot exhaust its attribute budget"))
+        self.next_with_attribute_budget(&mut AttributeBudget::new(usize::MAX), &mut Vec::new())
     }
 }
 
@@ -807,11 +896,32 @@ fn is_space(byte: u8) -> bool {
 }
 
 /// Fold ASCII case and replace NUL in tag and attribute names.
+#[inline(never)]
 fn normalize_name(input: &str) -> Cow<'_, str> {
+    // Single-letter names can borrow their lowercase spelling.
+    if let [byte @ b'A'..=b'Z'] = input.as_bytes() {
+        let start = usize::from(byte - b'A');
+        return Cow::Borrowed(&"abcdefghijklmnopqrstuvwxyz"[start..start + 1]);
+    }
     if input
         .bytes()
         .any(|byte| byte.is_ascii_uppercase() || byte == 0)
     {
+        let names: &'static [&str] = match input.len() {
+            2 => &["br", "hr"],
+            3 => &["col", "img", "wbr", "xmp"],
+            4 if matches!(input.as_bytes()[0], b'h' | b'H') => &["head", "href", "html"],
+            4 => &["area", "base", "body", "link", "meta", "name"],
+            5 => &["embed", "input", "param", "style", "title", "track"],
+            6 => &["iframe", "script", "source"],
+            7 => &["content", "noembed"],
+            8 => &["noframes", "textarea"],
+            9 => &["plaintext"],
+            _ => &[],
+        };
+        if let Some(&name) = names.iter().find(|name| name.eq_ignore_ascii_case(input)) {
+            return Cow::Borrowed(name);
+        }
         replace_null(Cow::Owned(input.to_ascii_lowercase()))
     } else {
         Cow::Borrowed(input)
@@ -828,19 +938,21 @@ fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    use super::Tokenizer;
+    use super::{AttributeBudget, Tokenizer};
     use crate::Error;
 
     #[test]
     fn attribute_budget_stops_before_scanning_the_next_name() {
         let source = "<a first='one' HREF='two&amp;three'>";
         let mut tokenizer = Tokenizer::new(source);
-        let mut remaining_attributes = 1;
-        assert!(matches!(
-            tokenizer.next_with_attribute_budget(&mut remaining_attributes),
-            Some(Err(Error::AttributeLimit))
-        ));
-        assert_eq!(remaining_attributes, 0);
+        let mut budget = AttributeBudget::new(1);
+        assert!(
+            tokenizer
+                .next_with_attribute_budget(&mut budget, &mut Vec::new())
+                .is_none()
+        );
+        assert_eq!(budget.check(), Err(Error::AttributeLimit));
+        assert_eq!(budget.remaining, 0);
         assert_eq!(tokenizer.position(), source.find("HREF").unwrap());
     }
 }
