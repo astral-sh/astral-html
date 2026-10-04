@@ -1,9 +1,6 @@
 # Fuzzing
 
-The fuzz workspace exercises the parser as a library. It has no network access
-or filesystem operations in its targets, and it does not execute embedded code.
-Inputs are UTF-8 because the public parser accepts `&str`. Byte decoding and
-encoding detection belong to the caller.
+Targets accept UTF-8 input, matching the library's `&str` APIs.
 
 `fuzz/seed_corpus.py` imports every UTF-8 scalar input from all 14 pinned html5lib
 tokenizer files, the pinned uv HTML fixtures, and the handwritten seeds. It skips
@@ -30,36 +27,27 @@ tests cover processing instructions separately. This exclusion applies only to
 the differential target; the parser, reader, and document targets still exercise
 those inputs.
 
-The entity target rejects `<`, `"`, NUL, and CR so that the reference tokenizer
-isolates character-reference decoding from markup and input normalization. The
-other targets cover these characters. Parser errors are recovered internally;
-only document resource-limit failures are exposed as errors.
+The entity target rejects `<`, `"`, NUL, and CR to isolate reference decoding
+from markup and input normalization. The other targets cover these characters.
 
 ## Running locally
 
-Install `cargo-fuzz` and a nightly toolchain, then run from the repository root:
+Install `cargo-fuzz` and a nightly toolchain, then seed and run a target from
+the repository root:
 
 ```console
 cargo install cargo-fuzz --version 0.13.2 --locked
-cargo +nightly fuzz run differential -- -dict=fuzz/html.dict -max_len=16384 -max_total_time=300 -timeout=5 -rss_limit_mb=2048 -print_final_stats=1
-```
-
-On an Ohm development checkout, use `cargo +ohm` for both commands and retain the
-checkout's configured target and shared build directories. Sanitizer builds need
-an Ohm toolchain with the corresponding Rust standard-library components.
-
-Keep generated corpus entries separate from the committed seeds:
-
-```console
 python3 fuzz/seed_corpus.py differential
 cargo +nightly fuzz run differential fuzz/generated/differential fuzz/corpus/differential -- -dict=fuzz/html.dict -max_len=16384 -max_total_time=900 -timeout=5 -rss_limit_mb=2048 -print_final_stats=1
 ```
 
-`cargo-fuzz` uses AddressSanitizer by default. Run all five targets; agreement
-with another tokenizer does not substitute for traversal and resource-limit
-testing. Each failure must be minimized, explained, and retained as a regression
-test. Do not discard a differential mismatch merely because the other parser
-disagrees with the expected result.
+On an Ohm development checkout, use `cargo +ohm` for Cargo commands and retain the
+checkout's configured target and shared build directories. Sanitizer builds need
+an Ohm toolchain with the corresponding Rust standard-library components.
+
+`cargo-fuzz` uses AddressSanitizer by default. Run all five targets, keeping
+generated inputs separate from committed seeds. Investigate differential
+mismatches and retain minimized failures as regression tests.
 
 To reproduce a saved failure and minimize it:
 
@@ -83,15 +71,13 @@ memory ceiling. The document target checks inputs up to 4 KiB with an independen
 model of reader events. It compares every tag and exact resource thresholds;
 repeated subtree and ancestor comparisons are limited to documents with at most
 128 elements. Larger inputs up to 16 KiB still exercise parsing and a bounded
-set of traversal and text queries. The model shares the event reader, so tokenization is checked by
-the conformance corpus and differential target. The document target also varies
-the total parsed-attribute budget. These limits make regressions reproducible;
-they do not establish a bound for every input accepted by the public API.
+set of traversal and text queries. The model shares the event reader;
+tokenization is checked by the conformance corpus and differential target.
+The document target also varies the total parsed-attribute budget.
 
-The workflow is an ongoing testing mechanism. A smoke run is not evidence of
-sustained coverage or production readiness. Record completed campaigns, compiler
-versions, total executions, seeds, failures, and remaining exclusions alongside
-the conformance and performance results before making release claims.
+Smoke runs do not establish sustained coverage or resource bounds beyond the
+tested inputs. Campaign records identify the tested compiler, source, seeds,
+limits, and results.
 
 ## Recorded local campaign
 
@@ -111,11 +97,9 @@ input ceiling, and input-length growth enabled immediately (`-len_control=0`).
 These are libFuzzer execution counts, including inputs rejected for invalid UTF-8
 or filtered by an oracle. The [metadata](../fuzz/evidence/2026-10-04/metadata.json)
 records exact commands, source and binary hashes, fixture provenance, the compiler,
-and individual results. The source hashes matched the checkout after completion.
+and individual results.
 
 The compiler was Ohm 1.98.1-dev (`f6270311094c`, LLVM 22.1.8) on x86-64 Linux.
 Its AddressSanitizer runtime archive was absent, so these local runs used
 `--sanitizer none`. Coverage instrumentation, debug assertions, and overflow
-checks remained enabled. This is evidence for the tested assertions and oracle
-comparisons, not an AddressSanitizer result. Linux CI runs the same targets with
-AddressSanitizer on its pinned nightly compiler.
+checks remained enabled. See [CI results](ci.md) for AddressSanitizer runs.
