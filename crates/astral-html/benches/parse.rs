@@ -1,7 +1,8 @@
 //! Compare equivalent parse-and-extract workloads in one process.
 //!
-//! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; the default suite
-//! includes captured and generated inputs. `ASTRAL_HTML_BENCH_CASE` filters names
+//! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
+//! names, comments, and scripts. The default suite includes captured and generated
+//! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
 //! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=astral|baseline`.
 //! `ASTRAL_HTML_BENCH_PROFILE_ITERATIONS` sets a positive iteration count (default: 100000).
 //! Profiling requires `--bench` and skips output comparison.
@@ -36,6 +37,7 @@ fn main() {
                 root_index,
             })
             .collect(),
+        Ok("scanning") => scanning_cases(),
         Err(std::env::VarError::NotPresent) | Ok("default") => vec![
             Case {
                 name: "iniconfig-captured",
@@ -84,7 +86,7 @@ fn main() {
                 root_index: false,
             },
         ],
-        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default or uv"),
+        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default, uv, or scanning"),
     };
 
     if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
@@ -241,4 +243,52 @@ fn attribute_index(count: usize, attributes: usize) -> String {
     }
     input.push_str("</body></html>");
     input
+}
+
+fn scanning_cases() -> Vec<Case> {
+    let script = format!(
+        "const records = [];\n{}",
+        "records.push({name: 'example', enabled: true});\n".repeat(512)
+    );
+    [
+        (
+            "names-generated",
+            "<PaCkAgE DaTa-CuStOm='record'><A HrEf='/demo.whl'>demo</A></PaCkAgE>".repeat(128),
+        ),
+        (
+            "comment-plain-generated",
+            format!(
+                "<!--{}-->",
+                "Build metadata for generated sources is retained here.\n".repeat(128)
+            ),
+        ),
+        (
+            "comment-complex-generated",
+            format!(
+                "<!--{}-->",
+                "Build metadata for source-map records includes café entries.\r\n".repeat(128)
+            ),
+        ),
+        (
+            "script-plain-generated",
+            format!("<script>{script}</script>"),
+        ),
+        (
+            "script-escaped-generated",
+            format!("<script><!--\n{script}//-->\n</script>"),
+        ),
+        (
+            "script-double-escaped-generated",
+            format!(
+                "<script><!--\nconst sample = '<script>';\n{script}const closing = '</script>';\n//-->\n</script>"
+            ),
+        ),
+    ]
+    .into_iter()
+    .map(|(name, body)| Case {
+        name,
+        input: format!("<!doctype html><html><body>{body}<a href=/demo.whl>demo</a></body></html>"),
+        root_index: false,
+    })
+    .collect()
 }
