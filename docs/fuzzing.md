@@ -82,7 +82,8 @@ Each input is limited to 16 KiB, with a five-second timeout and a 2 GiB resident
 memory ceiling. The document target checks inputs up to 4 KiB with an independent
 model of reader events. It compares every tag and exact resource thresholds;
 repeated subtree and ancestor comparisons are limited to documents with at most
-128 elements. The model shares the event reader, so tokenization is checked by
+128 elements. Larger inputs up to 16 KiB still exercise parsing and a bounded
+set of traversal and text queries. The model shares the event reader, so tokenization is checked by
 the conformance corpus and differential target. The document target also varies
 the total parsed-attribute budget. These limits make regressions reproducible;
 they do not establish a bound for every input accepted by the public API.

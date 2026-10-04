@@ -167,14 +167,12 @@ fn assert_tag(actual: Element<'_, '_>, expected: &Tag<'_>) {
 }
 
 fuzz_target!(|bytes: &[u8]| {
-    // Bound the independent model's linear name searches as well as its memory.
-    if bytes.len() > 4_096 {
+    if bytes.len() > 16_384 {
         return;
     }
     let Ok(source) = std::str::from_utf8(bytes) else {
         return;
     };
-    let model = Model::parse(source);
     let roomy = Limits {
         max_input_bytes: source.len(),
         max_nodes: source.len(),
@@ -182,6 +180,27 @@ fuzz_target!(|bytes: &[u8]| {
         max_attributes: source.len(),
     };
     let document = Document::parse_with_limits(source, roomy).expect("nonbinding limits");
+    // Preserve larger-input parsing and query coverage while bounding the
+    // independent model's linear name searches and repeated subtree walks.
+    if bytes.len() > 4_096 {
+        let count = document.elements().count();
+        assert!(count <= roomy.max_nodes);
+        for element in document.elements().take(16) {
+            assert!(element.descendants().count() <= count);
+            assert!(element.children().count() <= count);
+            std::hint::black_box(element.text());
+            let mut parent = element.parent();
+            for _ in 0..count {
+                let Some(ancestor) = parent else {
+                    break;
+                };
+                parent = ancestor.parent();
+            }
+            assert!(parent.is_none(), "parent cycle");
+        }
+        return;
+    }
+    let model = Model::parse(source);
     model.check(&document);
 
     // Test one limit at a time, so an unrelated earlier error cannot hide an
