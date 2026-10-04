@@ -73,12 +73,16 @@ test module, and runs:
 cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib
 ```
 
-The job requires a successful result with all 31 tests passing and retains the
-test output as an artifact. It uses Rust 1.97.1, matching uv's 1.97 minimum
-version. The local patch application and Cargo metadata checks pass; a full
-local uv-client build was not attempted because the development host had only
-about 1 GiB of free disk space. The integration job must pass before treating
-the upstream tests as verified.
+All **31 original uv-client HTML tests passed**, with zero failures, against
+uv revision `46b84fd0bfec23b72f29e8e2185ba68a65052f48` on Ubuntu 24.04 and Rust
+1.97.1 in [integration run 37208040489](https://github.com/viarius-experiments/astral-html/actions/runs/37208040489/job/111453271707).
+The job built uv-client with astral-html and verified that the upstream test
+module was unchanged before running it. Its source SHA-256 is
+`53c325ffa162b126e95af4cf6e3af87f7b5e041c170e2a2af3b7cd5ec5aeeb8a`.
+The [recorded result](uv-integration-results.json) includes the tested parser
+revision, source hashes, and all 31 passing test names. The workflow retains the
+full test output as an artifact and requires the same 31-test success result on
+future runs.
 
 The patch expects `uv-source` immediately below this repository, so its path
 dependency resolves to `../crates/astral-html`. The wider uv index and resolver

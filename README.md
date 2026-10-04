@@ -22,11 +22,13 @@ for element in document.elements().filter(|element| element.is("a")) {
 ## Validation
 
 - **Conformance:** all 7,045 supported html5lib tokenizer runs pass, with exact counts for the eight excluded non-scalar and XML-coercion cases. See the [conformance bar](docs/conformance.md).
-- **Compatibility:** all 32 pinned uv HTML inputs match `astral-tl` 0.8.0's extracted fields. See the [uv migration notes](docs/uv.md).
+- **Compatibility:** all 32 pinned uv HTML inputs match `astral-tl` 0.8.0's extracted fields, and the adapter passes all 31 original uv HTML tests. See the [uv migration notes](docs/uv.md).
 - **Fuzzing:** five targets exercise tokenizer states, entity decoding, the event reader, document traversal and limits, and an independent tokenizer oracle. Campaigns begin with the pinned conformance and uv inputs. See [fuzzing](docs/fuzzing.md) and [safety and resource use](docs/safety.md).
 - **Performance:** the [benchmark report](docs/performance.md) compares equivalent parse-and-extract work with `astral-tl`, using both the system allocator and uv's Linux allocator. It includes raw results, source hashes, and the cases that remain slower.
 
-The library is pre-release. The parser boundary is tested; replacing uv's dependency still requires its adapter changes and upstream integration tests. Browser tree construction, encoding detection, and script execution are outside the conformance target.
+The [CI report](docs/ci.md) links the completed Linux tests and AddressSanitizer campaigns.
+
+The library is pre-release. The pinned uv adapter passes uv-client's HTML tests; adoption in uv still requires its broader index and resolver integration tests. Browser tree construction, encoding detection, and script execution are outside the conformance target.
 
 ## Development
 
