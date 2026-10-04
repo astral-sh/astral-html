@@ -61,11 +61,13 @@ fn output(source: &str, state: State, last_start_tag: Option<&str>) -> Value {
                 json!(["Character", text])
             }
             Token::StartTag(tag) => {
+                let count = tag.attributes.len();
                 let attributes: BTreeMap<_, _> = tag
                     .attributes
                     .into_iter()
                     .map(|attribute| (attribute.name.into_owned(), attribute.value.into_owned()))
                     .collect();
+                assert_eq!(attributes.len(), count, "duplicate attribute names");
                 if tag.self_closing {
                     json!(["StartTag", tag.name, attributes, true])
                 } else {

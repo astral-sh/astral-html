@@ -27,6 +27,7 @@ for element in document.elements().filter(|element| element.is("a")) {
 - **Performance:** the [benchmark report](docs/performance.md) compares equivalent parse-and-extract work with `astral-tl`, using both the system allocator and uv's Linux allocator. It includes raw results, source hashes, and the cases that remain slower.
 
 The [CI report](docs/ci.md) links the completed Linux tests and AddressSanitizer campaigns.
+The [hardening review](docs/hardening.md) records the allocation fixes, stronger fuzz assertions, and remaining adoption work.
 
 The library is pre-release. The pinned uv adapter passes uv-client's HTML tests; adoption in uv still requires its broader index and resolver integration tests. Browser tree construction, encoding detection, and script execution are outside the conformance target.
 

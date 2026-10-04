@@ -24,10 +24,15 @@ fuzz_target!(|bytes: &[u8]| {
         (State::ScriptData, Some(context)),
     ] {
         let mut tokenizer = Tokenizer::with_state(source, state, last_start_tag);
-        for (index, token) in tokenizer.by_ref().enumerate() {
-            assert!(index <= source.len(), "tokenizer must make progress");
+        let mut previous = 0;
+        while let Some(token) = tokenizer.next() {
+            let position = tokenizer.position();
+            assert!(position > previous, "each token must consume input");
+            assert!(source.is_char_boundary(position));
+            previous = position;
             std::hint::black_box(token);
         }
+        assert_eq!(tokenizer.position(), source.len());
         assert!(tokenizer.next().is_none(), "end of input must be permanent");
     }
 });
