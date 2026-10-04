@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::FusedIterator;
 
-use memchr::{memchr, memchr3};
+use memchr::{memchr, memchr_iter, memchr3};
 
 use crate::entities::{decode, normalize};
 
@@ -818,18 +818,51 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
     }
 }
 
+/// Replace NUL, reusing owned buffers instead of allocating a second string.
 fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
-    if input.contains('\0') {
-        Cow::Owned(input.replace('\0', "\u{fffd}"))
-    } else {
-        input
+    let Some(first) = memchr(0, input.as_bytes()) else {
+        return input;
+    };
+    let Cow::Owned(input) = input else {
+        return Cow::Owned(input.replace('\0', "\u{fffd}"));
+    };
+    let nulls = memchr_iter(0, &input.as_bytes()[first..]).count();
+    let mut bytes = input.into_bytes();
+    let read = bytes.len();
+    bytes.reserve_exact(2 * nulls);
+    let mut write = read + 2 * nulls;
+    bytes.resize(write, 0);
+    // Expand from the end so writes cannot overwrite unread source bytes.
+    for read in (first..read).rev() {
+        if bytes[read] == 0 {
+            write -= 3;
+            bytes[write..write + 3].copy_from_slice("\u{fffd}".as_bytes());
+        } else {
+            write -= 1;
+            bytes[write] = bytes[read];
+        }
     }
+    Cow::Owned(String::from_utf8(bytes).expect("NUL replacement preserves UTF-8"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Tokenizer;
+    use std::borrow::Cow;
+
+    use super::{Tokenizer, replace_null};
     use crate::Error;
+
+    #[test]
+    fn owned_null_replacement_reuses_spare_capacity() {
+        for source in ["\0", "\0\0\0", "é\0🦀\0", "prefix\0suffix"] {
+            let mut input = String::with_capacity(3 * source.len());
+            input.push_str(source);
+            let allocation = input.as_ptr();
+            let output = replace_null(Cow::Owned(input));
+            assert_eq!(output, source.replace('\0', "\u{fffd}"));
+            assert_eq!(output.as_ptr(), allocation);
+        }
+    }
 
     #[test]
     fn attribute_budget_stops_before_scanning_the_next_name() {

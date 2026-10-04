@@ -5,6 +5,38 @@ use std::borrow::Cow;
 use astral_html::{State, Token, Tokenizer};
 
 #[test]
+fn owned_null_replacement_preserves_token_normalization() {
+    for state in [
+        State::Rcdata,
+        State::Rawtext,
+        State::ScriptData,
+        State::Plaintext,
+    ] {
+        assert_eq!(
+            Tokenizer::with_state("é\r\n\0🦀", state, None).next(),
+            Some(Token::Text(Cow::Borrowed("é\n�🦀")))
+        );
+    }
+    let Some(Token::StartTag(tag)) = Tokenizer::new("<A\0É B\0🦀=value>").next() else {
+        panic!("expected start tag");
+    };
+    assert_eq!(tag.name, "a�É");
+    assert_eq!(tag.attributes[0].name, "b�🦀");
+    let Some(Token::Doctype(doctype)) =
+        Tokenizer::new("<!DOCTYPE A\0É PUBLIC 'é\r\n\0🦀' 'x\0\r'>").next()
+    else {
+        panic!("expected doctype");
+    };
+    assert_eq!(doctype.name.as_deref(), Some("a�É"));
+    assert_eq!(doctype.public_id.as_deref(), Some("é\n�🦀"));
+    assert_eq!(doctype.system_id.as_deref(), Some("x�\n"));
+    assert_eq!(
+        Tokenizer::new("<!é\r\0🦀>").next(),
+        Some(Token::Comment(Cow::Borrowed("é\n�🦀")))
+    );
+}
+
+#[test]
 fn distinguishes_boolean_and_empty_attributes() {
     let Token::StartTag(tag) = Tokenizer::new("<a boolean empty='' unquoted=value missing=>")
         .next()
