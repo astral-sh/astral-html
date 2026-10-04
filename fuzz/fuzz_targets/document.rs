@@ -5,9 +5,8 @@ use std::borrow::Cow;
 use astral_html::{Document, Element, Error, Limits, Reader, Tag, Token};
 use libfuzzer_sys::fuzz_target;
 
-// The reference model uses explicit child links and a linear open-element stack,
-// independently of Document's subtree intervals and name index. Reusing Reader
-// intentionally leaves tokenizer correctness to the other fuzz targets.
+/// Reference tree with explicit child links instead of Document's subtree intervals.
+/// Reader reuse leaves tokenizer correctness to the other fuzz targets.
 struct Model<'a> {
     elements: Vec<ModelElement<'a>>,
     nodes: usize,
@@ -77,6 +76,7 @@ impl<'a> Model<'a> {
         model
     }
 
+    /// Walk descendant elements and text in source order, excluding the root.
     fn contents(&self, index: usize) -> impl Iterator<Item = &Child<'a>> {
         let mut pending: Vec<_> = self.elements[index].children.iter().rev().collect();
         std::iter::from_fn(move || {
@@ -89,8 +89,7 @@ impl<'a> Model<'a> {
     }
 
     fn check(&self, document: &Document<'a>) {
-        let actual: Vec<_> = document.elements().collect();
-        assert_eq!(actual.len(), self.elements.len());
+        assert_eq!(document.elements().count(), self.elements.len());
         let texts = (self.elements.len() <= 128).then(|| {
             (0..self.elements.len())
                 .map(|index| {
@@ -109,7 +108,7 @@ impl<'a> Model<'a> {
                 assert_eq!(element.text(), texts[index]);
             }
         };
-        for (index, element) in actual.into_iter().enumerate() {
+        for (index, element) in document.elements().enumerate() {
             check(element, index);
 
             // Repeated subtree and ancestor queries are deliberately bounded.
@@ -149,10 +148,8 @@ impl<'a> Model<'a> {
 fn assert_tag(actual: Element<'_, '_>, expected: &Tag<'_>) {
     assert_eq!(actual.name(), expected.name);
     assert!(actual.is(&expected.name.to_ascii_uppercase()));
-    let mut attributes = actual.attributes();
+    assert!(actual.attributes().eq(&expected.attributes));
     for expected in &expected.attributes {
-        let attribute = attributes.next().expect("missing attribute");
-        assert_eq!(attribute, expected);
         assert_eq!(actual.attribute(&expected.name), Some(expected));
         assert_eq!(
             actual.attribute(&expected.name.to_ascii_uppercase()),
@@ -160,7 +157,6 @@ fn assert_tag(actual: Element<'_, '_>, expected: &Tag<'_>) {
         );
         assert!(actual.has_attribute(&expected.name));
     }
-    assert!(attributes.next().is_none(), "unexpected attribute");
     // Tokenizer attribute names cannot be empty.
     assert!(actual.attribute("").is_none());
     assert!(!actual.has_attribute(""));

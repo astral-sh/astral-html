@@ -8,7 +8,7 @@ use memchr::{memchr, memchr3};
 
 use crate::entities::{decode, normalize};
 
-/// A tokenizer entry state, including the text modes selected by a tree builder.
+/// A tokenizer state selected by the caller or a tree builder.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub enum State {
     /// Ordinary HTML content.
@@ -22,7 +22,7 @@ pub enum State {
     ScriptData,
     /// Text through the end of the input.
     Plaintext,
-    /// A CDATA section entered by a foreign-content tree builder.
+    /// CDATA content; `]]>` resumes the data state.
     Cdata,
 }
 
@@ -31,9 +31,9 @@ pub enum State {
 pub struct Attribute<'a> {
     /// The ASCII-lowercase attribute name.
     pub name: Cow<'a, str>,
-    /// The decoded attribute value, or an empty string for a boolean attribute.
+    /// The decoded value, empty when no value was provided.
     pub value: Cow<'a, str>,
-    /// The source value without surrounding quotes, or `None` for a boolean attribute.
+    /// The source value without quotes, or `None` when `=` was absent.
     pub raw_value: Option<&'a str>,
 }
 
@@ -82,7 +82,7 @@ pub enum Token<'a> {
     StartTag(Tag<'a>),
     /// A closing tag.
     EndTag(Tag<'a>),
-    /// Text with input preprocessing and character references applied as appropriate.
+    /// Input newlines are normalized; data and RCDATA states also decode references.
     Text(Cow<'a, str>),
     /// An HTML comment, including bogus comments.
     Comment(Cow<'a, str>),
@@ -97,10 +97,10 @@ pub enum Token<'a> {
     },
 }
 
-/// A nonrecursive HTML tokenizer borrowing its UTF-8 source.
+/// An HTML tokenizer over borrowed UTF-8 input.
 ///
-/// This implements tokenization, not HTML tree construction. A caller that
-/// supplies tree context must select text states with [`Self::set_state`].
+/// Tree construction is left to the caller, which selects text modes with
+/// [`Self::set_state`].
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a> {
     source: &'a str,
@@ -116,7 +116,10 @@ impl<'a> Tokenizer<'a> {
         Self::with_state(source, State::Data, None)
     }
 
-    /// Tokenize a fragment with the state and last start tag supplied by its context.
+    /// Tokenize a fragment in the given state.
+    ///
+    /// `last_start_tag` identifies the end tag that can close a text mode.
+    /// Only nonempty names consisting of ASCII letters can match.
     #[must_use]
     pub fn with_state(source: &'a str, state: State, last_start_tag: Option<&str>) -> Self {
         Self {
@@ -129,7 +132,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Select the text mode for the next token using caller-supplied tree context.
+    /// Change the state and end-tag context without advancing the source position.
     pub fn set_state(&mut self, state: State, last_start_tag: Option<&str>) {
         self.state = state;
         self.last_start_tag = last_start_tag
@@ -137,25 +140,23 @@ impl<'a> Tokenizer<'a> {
             .map(|name| Cow::Owned(name.to_ascii_lowercase()));
     }
 
-    /// Return the consumed source length in bytes.
+    /// Return the byte offset of the next unread source character.
     #[must_use]
     pub fn position(&self) -> usize {
         self.position
     }
 
-    /// Read the byte at the current source position.
     fn current(&self) -> Option<u8> {
         self.source.as_bytes().get(self.position).copied()
     }
 
-    /// Skip HTML whitespace without decoding unrelated source text.
     fn whitespace(&mut self) {
         while self.current().is_some_and(is_space) {
             self.position += 1;
         }
     }
 
-    /// Determine whether this position opens the appropriate end tag for a text mode.
+    /// Match `</name` followed by whitespace, `/`, or `>`, using the last start tag.
     fn appropriate_end(&self, at: usize) -> bool {
         let Some(name) = self.last_start_tag.as_deref() else {
             return false;
@@ -170,7 +171,7 @@ impl<'a> Tokenizer<'a> {
                 .is_some_and(|&byte| is_space(byte) || matches!(byte, b'/' | b'>'))
     }
 
-    /// Read a tag, dropping incomplete tags at EOF as required by tokenization.
+    /// Parse a tag, discarding it if EOF arrives before `>`.
     fn tag(
         &mut self,
         end: bool,
@@ -247,8 +248,7 @@ impl<'a> Tokenizer<'a> {
             } else {
                 None
             };
-            // Most HTML tags have very few attributes. Keep that case allocation-free
-            // while bounding the work for tags with many distinct attribute names.
+            // Scan small lists; index larger lists to avoid quadratic duplicate checks.
             let duplicate = if attributes.len() < 8 {
                 attributes
                     .iter()
@@ -284,7 +284,6 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Consume a bogus comment up to its closing greater-than sign.
     fn bogus_comment(&mut self, start: usize) -> Token<'a> {
         while self.current().is_some_and(|byte| byte != b'>') {
             self.position += 1;
@@ -296,7 +295,6 @@ impl<'a> Tokenizer<'a> {
         result
     }
 
-    /// Consume a comment using the specification's delimiter recovery states.
     fn comment(&mut self) -> Token<'a> {
         #[derive(Clone, Copy)]
         enum CommentState {
@@ -428,7 +426,8 @@ impl<'a> Tokenizer<'a> {
         Token::Comment(Cow::Owned(data))
     }
 
-    /// Read a quoted public or system identifier and report whether its quote closed.
+    /// Read a quoted doctype identifier up to its quote, `>`, or EOF.
+    /// The boolean is true only when the closing quote was consumed.
     fn identifier(&mut self) -> (Cow<'a, str>, bool) {
         let quote = self.current().expect("identifier starts at a quote");
         self.position += 1;
@@ -447,7 +446,6 @@ impl<'a> Tokenizer<'a> {
         (value, closed)
     }
 
-    /// Consume the remainder of a malformed document type declaration.
     fn finish_doctype(&mut self, doctype: Doctype<'a>) -> Token<'a> {
         while self.current().is_some_and(|byte| byte != b'>') {
             self.position += 1;
@@ -458,7 +456,6 @@ impl<'a> Tokenizer<'a> {
         Token::Doctype(doctype)
     }
 
-    /// Read a document type declaration, retaining its quirks flag and identifiers.
     fn doctype(&mut self) -> Token<'a> {
         let mut doctype = Doctype {
             name: None,
@@ -536,7 +533,7 @@ impl<'a> Tokenizer<'a> {
         self.finish_doctype(doctype)
     }
 
-    /// Read a processing instruction or recover it as a bogus comment.
+    /// Recover invalid targets as bogus comments; discard unfinished instructions at EOF.
     fn processing_instruction(&mut self) -> Option<Token<'a>> {
         let comment_start = self.position + 1;
         self.position += 2;
@@ -565,12 +562,8 @@ impl<'a> Tokenizer<'a> {
             self.position += 1;
         }
         self.current()?;
-        let end = if self.position > start && self.source.as_bytes()[self.position - 1] == b'?' {
-            self.position - 1
-        } else {
-            self.position
-        };
-        let data = normalize(&self.source[start..end]);
+        let data = &self.source[start..self.position];
+        let data = normalize(data.strip_suffix('?').unwrap_or(data));
         self.position += 1;
         Some(Token::ProcessingInstruction {
             target: Cow::Borrowed(target),
@@ -578,7 +571,7 @@ impl<'a> Tokenizer<'a> {
         })
     }
 
-    /// Scan script text while accounting for escaped and double-escaped regions.
+    /// Find an appropriate end tag outside double-escaped content, or return EOF.
     fn script_end(&self, start: usize) -> usize {
         #[derive(Clone, Copy)]
         enum Script {
@@ -679,7 +672,8 @@ impl<'a> Tokenizer<'a> {
         at
     }
 
-    /// Read a token, checking each attribute before name or value allocation.
+    /// Count each attribute before allocating its name or value.
+    /// Duplicates and end-tag attributes count. Callers must stop after a limit error.
     pub(crate) fn next_with_attribute_budget(
         &mut self,
         remaining_attributes: &mut usize,
@@ -803,17 +797,16 @@ impl<'a> Iterator for Tokenizer<'a> {
 
 impl FusedIterator for Tokenizer<'_> {}
 
-/// Validate a context name once: text-mode end-tag name states consume ASCII letters only.
+/// Text states accumulate only ASCII letters in end-tag names.
 fn can_end_text(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_alphabetic())
 }
 
-/// Determine whether a byte is HTML whitespace before newline preprocessing.
 fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
-/// Normalize a tag or attribute name without allocating for ordinary lowercase names.
+/// Fold ASCII case and replace NUL in tag and attribute names.
 fn normalize_name(input: &str) -> Cow<'_, str> {
     if input
         .bytes()
@@ -825,7 +818,6 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
     }
 }
 
-/// Apply the null-character replacement required outside the data and CDATA states.
 fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
     if input.contains('\0') {
         Cow::Owned(input.replace('\0', "\u{fffd}"))

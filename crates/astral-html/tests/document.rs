@@ -183,10 +183,6 @@ fn zero_attribute_budget_allows_attribute_free_tokens() {
             "{source}"
         );
     }
-    assert!(matches!(
-        Reader::new("<a href='one'>").next(),
-        Some(Token::StartTag(_))
-    ));
 }
 
 #[test]

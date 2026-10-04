@@ -26,11 +26,10 @@ fuzz_target!(|bytes: &[u8]| {
 
     let markup = format!("<a value=\"{source}\">");
     let tag = Tokenizer::new(markup.as_str())
-        .filter_map(|token| match token.unwrap() {
+        .find_map(|token| match token.unwrap() {
             Token::StartTag(tag) => Some(tag),
             _ => None,
         })
-        .next()
         .unwrap();
     let value = tag.attributes.values().next().unwrap();
     assert_eq!(decode(source, true).as_bytes(), value.as_ref());
