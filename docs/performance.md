@@ -92,8 +92,7 @@ allocation counts exclude application output.
 
 The [hardening campaign](benchmarks/2026-10-04-hardening-jemalloc.csv)
 measured 0.90–2.33× across the six index workloads with jemalloc. CodeArtifact
-and the flat-index fixture took about 11% longer then; the current runs measure
-the changes made to address those costs. Its
+and the flat-index fixture took about 11% longer then. Its
 [environment and source hashes](benchmarks/2026-10-04-hardening-environment.json)
 remain available.
 
@@ -137,8 +136,6 @@ indexes it also extracts base/status fields and decodes each href, while uv
 checks href presence and reads project text. For project indexes it extracts
 both metadata attributes, while uv short-circuits the fallback. These extra
 operations run for both parsers.
-
-Results apply to the recorded source hashes, host, inputs, and allocator.
 
 ## Reproduce
 
