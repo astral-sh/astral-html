@@ -38,7 +38,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo bench -p astral-html --bench parse --features benchmark-jemalloc
 ```
 
-CI tests Linux with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, and AddressSanitizer fuzz smoke runs. On an Ohm development checkout, use `cargo +ohm` and keep a separate target directory for the checkout and shared build directory for the toolchain.
+CI uses Namespace's Ubuntu 24.04 runners and tests AMD64 and ARM64 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, and AddressSanitizer fuzz smoke runs. On an Ohm development checkout, use `cargo +ohm` and keep a separate target directory for the checkout and shared build directory for the toolchain.
 
 ## License
 
