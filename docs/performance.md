@@ -15,12 +15,13 @@ ASTRAL_HTML_BENCH_SUITE=uv cargo bench -p astral-html --bench parse --locked --f
 
 The default suite includes captured and generated package indexes, many
 attributes, long text, and entities. The `uv` suite covers all 32 pinned HTML
-fixtures. The optional jemalloc feature matches uv's allocator on supported
+fixtures. The `scanning` suite adds generated names, comments, and scripts.
+The optional jemalloc feature matches uv's allocator on supported
 Linux architectures; otherwise the benchmark uses the system allocator.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ASTRAL_HTML_BENCH_SUITE` | `default` | Select `default` or `uv` inputs. |
+| `ASTRAL_HTML_BENCH_SUITE` | `default` | Select `default`, `uv`, or `scanning` inputs. |
 | `ASTRAL_HTML_BENCH_CASE` | All cases | Filter case names by substring. |
 | `ASTRAL_HTML_BENCH_SAMPLES` | `21` | Samples per parser and case; at least 3. |
 | `ASTRAL_HTML_BENCH_SAMPLE_MS` | `100` | Combined warmup duration in milliseconds. |
