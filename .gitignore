@@ -3,5 +3,8 @@
 /fuzz/artifacts/
 /fuzz/coverage/
 /fuzz/corpus/generated/
+/fuzz/generated/
+/fuzz/logs/
+/fuzz/final-corpus/
 *.profraw
 
