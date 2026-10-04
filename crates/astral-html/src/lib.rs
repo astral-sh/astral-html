@@ -5,7 +5,7 @@
 //! retains lexical element scopes for repeated queries, with configurable [`Limits`].
 //!
 //! Input must already be decoded UTF-8. Unchanged strings borrow from that input.
-//! The parser does not implement browser tree construction or execute scripts.
+//! The parser does not implement browser tree construction.
 
 mod document;
 mod entities;
