@@ -18,7 +18,7 @@ This includes malformed tags and attributes, duplicate attributes, comment recov
 
 `Document` retains source-order elements and text. Each start tag opens a scope, except HTML void elements. The self-closing flag on other HTML elements is ignored. A matching end tag closes its element and any open descendants. An unmatched end tag is ignored; remaining scopes close at EOF. No elements are inserted, moved, or cloned. Comments, doctypes, and processing instructions remain available in the token APIs but are not retained in the document.
 
-This is deliberately not a browser DOM. For example, `<p>one<p>two` contains nested source scopes; the browser tree builder would implicitly close the first paragraph. Tables are not repaired, formatting elements are not reconstructed, and absent `html`, `head`, and `body` elements are not inserted. There is no CSS selector engine, script execution, mutation, or HTML serialization.
+For example, `<p>one<p>two` contains nested source scopes; a browser tree builder would close the first paragraph. Tables are not repaired, formatting elements are not reconstructed, and absent `html`, `head`, and `body` elements are not inserted. Encoding detection, CSS selectors, script execution, mutation, and serialization are out of scope.
 
 Names use ASCII case folding. Duplicate attributes keep the first normalized name. Attribute values are decoded exactly once; `raw_value` preserves their input spelling and distinguishes boolean attributes from explicit empty values. Text queries concatenate decoded descendant text without inserting layout whitespace; script and style text remains present.
 
@@ -26,4 +26,4 @@ Names use ASCII case folding. Duplicate attributes keep the first normalized nam
 
 All **32 pinned uv HTML inputs** must produce the same extracted fields as `astral-tl` 0.8.0. The comparison includes project metadata, base URLs, file attributes, boolean values, and root-index text. Additional tests vary name casing, whitespace, quoting, attribute order, and nesting. [uv.md](uv.md) describes the adapter changes and the upstream integration tests needed before replacing uv's dependency.
 
-Malformed input follows the stated HTML tokenization and lexical-scope rules, rather than preserving every behavior of `astral-tl`. Neither conformance corpus completion nor agreement with another parser establishes browser tree equivalence.
+Malformed input follows the tokenization and lexical-scope rules above, which can differ from astral-tl.

@@ -13,7 +13,7 @@ root index pages, remote flat indexes, and local `--find-links` HTML files.
 | Parse a UTF-8 response | `Document::parse` |
 | Iterate elements in source order | `Document::elements` |
 | Match an HTML element name | `Element::is` |
-| Find an attribute without case-sensitive spelling assumptions | `Element::attribute` |
+| Match an attribute name without ASCII case sensitivity | `Element::attribute` |
 | Distinguish absent and boolean attributes | `Element::has_attribute`, `Attribute::raw_value` field |
 | Read the first `head` element's metadata | `Element::descendants` |
 | Extract a root index anchor's project name | `Element::text` |
@@ -25,15 +25,10 @@ Package pages use the first `base` element before an `a` or `link`, the first
 Root index pages also read anchor text. uv performs package-name normalization,
 URL resolution, percent decoding, hash validation, and result sorting itself.
 
-No mutation, selector engine, ID index, class index, or HTML serialization is
-needed for these call sites.
-
 ## Entity decoding
 
-The `Attribute::value` field contains decoded attribute text, and `Element::text`
-returns decoded descendant text. The existing uv adapter explicitly calls
-`html_escape::decode_html_entities` after reading most
-attributes from astral-tl. Remove those calls when using the decoded API:
+`Attribute::value` and `Element::text` return decoded text. Remove uv's
+`html_escape::decode_html_entities` calls when using these APIs:
 decoding `&amp;lt;` twice would incorrectly produce `<` instead of `&lt;`.
 The `Attribute::raw_value` field retains the input spelling when a caller needs
 it and is `None` for a boolean attribute. An absent attribute is represented by
@@ -43,8 +38,7 @@ There are deliberate differences from astral-tl outside the compatibility
 fixtures. HTML character references are decoded in the correct text or
 attribute context, element and attribute names are matched without ASCII case
 sensitivity, and raw-text elements do not expose embedded markup as links.
-The parser's conformance documentation defines the supported HTML behavior;
-astral-tl's behavior on malformed input is not the specification.
+See the [conformance contract](conformance.md) for recovery behavior.
 
 ## Compatibility evidence
 
@@ -53,9 +47,6 @@ astral-tl's behavior on malformed input is not the specification.
 retain their upstream test names, revision, and licenses. The comparison covers
 base URLs, project metadata, link attributes, boolean attributes, and root index
 text. Additional assertions check the decoded values uv consumes.
-
-These local comparisons validate the parser boundary. They do not run uv's
-resolver, HTTP client, URL validation, or packaging logic.
 
 ## Pinned uv integration
 
@@ -70,19 +61,17 @@ exact uv revision into `uv-source`, applies the patch, verifies the unchanged
 test module, and runs:
 
 ```console
-cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib
+cargo test --manifest-path uv-source/Cargo.toml -p uv-client html::tests --lib --locked
 ```
 
 All **31 original uv-client HTML tests passed**, with zero failures, against
 uv revision `46b84fd0bfec23b72f29e8e2185ba68a65052f48` on Ubuntu 24.04 and Rust
 1.97.1 in [integration run 37208040489](https://github.com/viarius-experiments/astral-html/actions/runs/37208040489/job/111453271707).
-The job built uv-client with astral-html and verified that the upstream test
-module was unchanged before running it. Its source SHA-256 is
-`53c325ffa162b126e95af4cf6e3af87f7b5e041c170e2a2af3b7cd5ec5aeeb8a`.
 The [recorded result](uv-integration-results.json) includes the tested parser
-revision, source hashes, and all 31 passing test names. The workflow retains the
-full test output as an artifact and requires the same 31-test success result on
-future runs.
+revision, source hashes, and all 31 passing test names. CI requires the same
+31-test success result on each run. The workflow resolves/builds the adapted
+dependency graph before testing with `--locked`, and retains the resulting
+lockfile, checksum, and test output.
 
 The patch expects `uv-source` immediately below this repository, so its path
 dependency resolves to `../crates/astral-html`. The wider uv index and resolver
@@ -90,24 +79,10 @@ integration suite remains a separate adoption check.
 
 ## Performance
 
-`cargo bench -p astral-html --bench parse` compares parse plus uv field extraction
-with astral-tl 0.8.0. Both implementations use the same process, compiler,
-profile, allocator, inputs, and owned output type. Every input's complete output
-is checked for equality before measuring. Timings include parsing, field lookup,
-entity decoding where uv needs it, output allocation, and destruction.
+The [benchmark report](performance.md) compares equivalent parsing and field
+extraction with astral-tl, including allocations and destruction. It excludes
+uv's HTTP, URL validation, packaging, and resolver work.
 
-The harness alternates measurement order, warms both implementations, and
-reports the median and 10th/90th percentile sample timings. It includes a
-captured PyPI response, uv's CodeArtifact and flat-index fixtures, and generated
-indexes with 1,000 or 10,000 links, 64 extra attributes per link, a 1 MiB text
-node, and frequent character references. Generated results must not be described as
-captured production traffic. Set `ASTRAL_HTML_BENCH_SAMPLES` and
-`ASTRAL_HTML_BENCH_SAMPLE_MS` to control sampling.
-
-The library does not install a global allocator. The default benchmark uses the
-system allocator for both implementations. Add `--features benchmark-jemalloc`
-to run both implementations with jemalloc in the benchmark executable.
-uv installs jemalloc on its supported
-Linux architectures and mimalloc on Windows in a separate application crate;
-allocator selection should remain with the embedding application. Results from
-this harness do not establish performance for uv's full network and resolver workload.
+Allocator selection belongs to the application. uv uses jemalloc on supported
+Linux architectures and mimalloc on Windows. The benchmark defaults to the
+system allocator; `--features benchmark-jemalloc` selects jemalloc for both parsers.

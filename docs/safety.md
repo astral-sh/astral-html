@@ -1,6 +1,6 @@
 # Safety and resource use
 
-The parser crate forbids unsafe Rust. Input scanning uses checked slices and the `memchr` crate; unchanged strings borrow from the caller's UTF-8 input. The library does not select a global allocator, access the network, open files, execute scripts, or load external resources.
+The parser crate forbids unsafe Rust and scans UTF-8 input with checked slices and `memchr`. It performs no I/O, executes no scripts, and leaves allocator selection to the application.
 
 Tokenization and document construction are iterative. The document stores nodes and subtree endpoints in a flat vector, so nested input does not produce recursive parsing, traversal, or destruction. Tests cover a depth of 10,000, repeated element names across deep-scope indexing, and long sequences of unmatched end tags.
 
@@ -25,6 +25,4 @@ Node and depth limits are checked before retaining the next node. The current to
 
 ## Evidence
 
-Validation includes the complete supported tokenizer corpus, uv field comparisons, document-limit boundary tests, deep traversal and destruction, and independent differential fuzzing. [fuzzing.md](fuzzing.md) records the targets, exclusions, campaign limits, and completed runs. Linux CI runs tests, documentation, formatting, Clippy, packaging, and AddressSanitizer fuzz smoke tests; scheduled runs extend the fuzz campaigns after the workflow reaches the default branch.
-
-Safe Rust and successful campaigns reduce specific risks. They do not prove termination or resource bounds for every possible input, establish semantic equivalence to a browser, or replace continued fuzzing and upstream uv integration testing.
+Tests cover tokenizer conformance, uv fields, limit boundaries, and deep traversal and destruction. See the [fuzz targets and campaigns](fuzzing.md), [Linux CI results](ci.md), and [remaining hardening work](hardening.md#remaining-work-before-adoption). These checks do not prove resource bounds for all inputs.
