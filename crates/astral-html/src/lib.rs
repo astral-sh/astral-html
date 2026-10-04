@@ -5,5 +5,7 @@
 
 mod entities;
 mod entities_data;
+mod tokenizer;
 
 pub use entities::{decode, normalize};
+pub use tokenizer::{Attribute, Doctype, State, Tag, Token, Tokenizer};

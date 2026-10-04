@@ -1,0 +1,798 @@
+//! HTML tokenization over UTF-8 source text.
+
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::iter::FusedIterator;
+
+use memchr::{memchr, memchr3};
+
+use crate::entities::{decode, normalize};
+
+/// A tokenizer entry state, including the text modes selected by a tree builder.
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub enum State {
+    /// Ordinary HTML content.
+    #[default]
+    Data,
+    /// Text with character references, as in `title` and `textarea`.
+    Rcdata,
+    /// Text without character references, as in `style`.
+    Rawtext,
+    /// Script text, including HTML comment escapes.
+    ScriptData,
+    /// Text through the end of the input.
+    Plaintext,
+    /// A CDATA section entered by a foreign-content tree builder.
+    Cdata,
+}
+
+/// An attribute. The first occurrence of each normalized name is retained.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Attribute<'a> {
+    /// The ASCII-lowercase attribute name.
+    pub name: Cow<'a, str>,
+    /// The decoded attribute value, or an empty string for a boolean attribute.
+    pub value: Cow<'a, str>,
+    /// The source value without surrounding quotes, or `None` for a boolean attribute.
+    pub raw_value: Option<&'a str>,
+}
+
+impl<'a> Attribute<'a> {
+    /// Return the decoded attribute value.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    /// Return the source value, or `None` when no equals sign was present.
+    #[must_use]
+    pub fn raw_value(&self) -> Option<&'a str> {
+        self.raw_value
+    }
+}
+
+/// A start or end tag.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Tag<'a> {
+    /// The ASCII-lowercase tag name.
+    pub name: Cow<'a, str>,
+    /// Attributes in source order, with duplicate names removed.
+    pub attributes: Vec<Attribute<'a>>,
+    /// Whether the tag ended with `/>`.
+    pub self_closing: bool,
+}
+
+/// A document type declaration.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Doctype<'a> {
+    /// The ASCII-lowercase name, if present.
+    pub name: Option<Cow<'a, str>>,
+    /// The public identifier, if present.
+    pub public_id: Option<Cow<'a, str>>,
+    /// The system identifier, if present.
+    pub system_id: Option<Cow<'a, str>>,
+    /// Whether the declaration requires quirks mode.
+    pub force_quirks: bool,
+}
+
+/// An HTML token. Adjacent text tokens may be emitted separately.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Token<'a> {
+    /// An opening tag.
+    StartTag(Tag<'a>),
+    /// A closing tag.
+    EndTag(Tag<'a>),
+    /// Text with input preprocessing and character references applied as appropriate.
+    Text(Cow<'a, str>),
+    /// An HTML comment, including bogus comments.
+    Comment(Cow<'a, str>),
+    /// A document type declaration.
+    Doctype(Doctype<'a>),
+    /// A processing instruction as defined by the HTML Living Standard.
+    ProcessingInstruction {
+        /// The processing instruction's case-sensitive target.
+        target: Cow<'a, str>,
+        /// The instruction's data, excluding the closing `?`, if present.
+        data: Cow<'a, str>,
+    },
+}
+
+/// A nonrecursive HTML tokenizer borrowing its UTF-8 source.
+///
+/// This implements tokenization, not HTML tree construction. A caller that
+/// supplies tree context must select text states with [`Self::set_state`].
+#[derive(Debug, Clone)]
+pub struct Tokenizer<'a> {
+    source: &'a str,
+    position: usize,
+    state: State,
+    last_start_tag: Option<Cow<'a, str>>,
+}
+
+impl<'a> Tokenizer<'a> {
+    /// Tokenize a complete source in the data state.
+    #[must_use]
+    pub fn new(source: &'a str) -> Self {
+        Self::with_state(source, State::Data, None)
+    }
+
+    /// Tokenize a fragment with the state and last start tag supplied by its context.
+    #[must_use]
+    pub fn with_state(source: &'a str, state: State, last_start_tag: Option<&str>) -> Self {
+        Self {
+            source,
+            position: 0,
+            state,
+            last_start_tag: last_start_tag.map(|name| Cow::Owned(name.to_ascii_lowercase())),
+        }
+    }
+
+    /// Select the text mode for the next token using caller-supplied tree context.
+    pub fn set_state(&mut self, state: State, last_start_tag: Option<&str>) {
+        self.state = state;
+        self.last_start_tag = last_start_tag.map(|name| Cow::Owned(name.to_ascii_lowercase()));
+    }
+
+    /// Return the consumed source length in bytes.
+    #[must_use]
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Read the byte at the current source position.
+    fn current(&self) -> Option<u8> {
+        self.source.as_bytes().get(self.position).copied()
+    }
+
+    /// Skip HTML whitespace without decoding unrelated source text.
+    fn whitespace(&mut self) {
+        while self.current().is_some_and(is_space) {
+            self.position += 1;
+        }
+    }
+
+    /// Determine whether this position opens the appropriate end tag for a text mode.
+    fn appropriate_end(&self, at: usize) -> bool {
+        let Some(name) = self.last_start_tag.as_deref() else {
+            return false;
+        };
+        let rest = &self.source.as_bytes()[at..];
+        rest.starts_with(b"</")
+            && rest
+                .get(2..2 + name.len())
+                .is_some_and(|candidate| candidate.eq_ignore_ascii_case(name.as_bytes()))
+            && rest
+                .get(2 + name.len())
+                .is_some_and(|&byte| is_space(byte) || matches!(byte, b'/' | b'>'))
+    }
+
+    /// Read a tag, dropping incomplete tags at EOF as required by tokenization.
+    fn tag(&mut self, end: bool) -> Option<Token<'a>> {
+        self.position += if end { 2 } else { 1 };
+        let name_start = self.position;
+        while self
+            .current()
+            .is_some_and(|byte| !is_space(byte) && !matches!(byte, b'/' | b'>'))
+        {
+            self.position += 1;
+        }
+        let name = normalize_name(&self.source[name_start..self.position]);
+        let mut attributes = Vec::<Attribute<'a>>::new();
+        let mut seen: Option<HashSet<Cow<'a, str>>> = None;
+        let mut self_closing = false;
+        loop {
+            self.whitespace();
+            match self.current()? {
+                b'>' => {
+                    self.position += 1;
+                    break;
+                }
+                b'/' => {
+                    self.position += 1;
+                    if self.current() == Some(b'>') {
+                        self.position += 1;
+                        self_closing = true;
+                        break;
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+            let start = self.position;
+            // An equals sign can be the first character of an attribute name.
+            self.position += 1;
+            while self
+                .current()
+                .is_some_and(|byte| !is_space(byte) && !matches!(byte, b'/' | b'>' | b'='))
+            {
+                self.position += 1;
+            }
+            let attr_name = normalize_name(&self.source[start..self.position]);
+            self.whitespace();
+            let raw_value = if self.current() == Some(b'=') {
+                self.position += 1;
+                self.whitespace();
+                let quote = self.current()?;
+                if matches!(quote, b'\'' | b'"') {
+                    self.position += 1;
+                    let start = self.position;
+                    self.position = memchr(quote, &self.source.as_bytes()[start..])
+                        .map_or(self.source.len(), |offset| start + offset);
+                    let value = &self.source[start..self.position];
+                    self.current()?;
+                    self.position += 1;
+                    Some(value)
+                } else {
+                    let start = self.position;
+                    while self
+                        .current()
+                        .is_some_and(|byte| !is_space(byte) && byte != b'>')
+                    {
+                        self.position += 1;
+                    }
+                    Some(&self.source[start..self.position])
+                }
+            } else {
+                None
+            };
+            // Most HTML tags have very few attributes. Keep that case allocation-free
+            // while bounding the work for tags with many distinct attribute names.
+            let duplicate = if attributes.len() < 8 {
+                attributes
+                    .iter()
+                    .any(|attribute| attribute.name == attr_name)
+            } else {
+                !seen
+                    .get_or_insert_with(|| {
+                        attributes
+                            .iter()
+                            .map(|attribute| attribute.name.clone())
+                            .collect()
+                    })
+                    .insert(attr_name.clone())
+            };
+            if !duplicate {
+                attributes.push(Attribute {
+                    name: attr_name,
+                    value: raw_value.map_or(Cow::Borrowed(""), |value| decode(value, true)),
+                    raw_value,
+                });
+            }
+        }
+        let tag = Tag {
+            name,
+            attributes,
+            self_closing,
+        };
+        if end {
+            Some(Token::EndTag(tag))
+        } else {
+            self.last_start_tag = Some(tag.name.clone());
+            Some(Token::StartTag(tag))
+        }
+    }
+
+    /// Consume a bogus comment up to its closing greater-than sign.
+    fn bogus_comment(&mut self, start: usize) -> Token<'a> {
+        while self.current().is_some_and(|byte| byte != b'>') {
+            self.position += 1;
+        }
+        let result = Token::Comment(replace_null(normalize(&self.source[start..self.position])));
+        if self.current().is_some() {
+            self.position += 1;
+        }
+        result
+    }
+
+    /// Consume a comment using the specification's delimiter recovery states.
+    fn comment(&mut self) -> Token<'a> {
+        #[derive(Clone, Copy)]
+        enum CommentState {
+            Start,
+            StartDash,
+            Data,
+            Less,
+            Bang,
+            BangDash,
+            BangDashDash,
+            EndDash,
+            End,
+            EndBang,
+        }
+        let mut state = CommentState::Start;
+        let mut data = String::new();
+        while let Some(ch) = self.source[self.position..].chars().next() {
+            let mut consume = true;
+            match state {
+                CommentState::Start => match ch {
+                    '-' => state = CommentState::StartDash,
+                    '>' => {
+                        self.position += 1;
+                        break;
+                    }
+                    _ => {
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                },
+                CommentState::StartDash => match ch {
+                    '-' => state = CommentState::End,
+                    '>' => {
+                        self.position += 1;
+                        break;
+                    }
+                    _ => {
+                        data.push('-');
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                },
+                CommentState::Data => match ch {
+                    '<' => {
+                        data.push('<');
+                        state = CommentState::Less;
+                    }
+                    '-' => state = CommentState::EndDash,
+                    '\0' => data.push('\u{fffd}'),
+                    _ => data.push(ch),
+                },
+                CommentState::Less => match ch {
+                    '!' => {
+                        data.push('!');
+                        state = CommentState::Bang;
+                    }
+                    '<' => data.push('<'),
+                    _ => {
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                },
+                CommentState::Bang => {
+                    if ch == '-' {
+                        state = CommentState::BangDash;
+                    } else {
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                }
+                CommentState::BangDash => {
+                    if ch == '-' {
+                        state = CommentState::BangDashDash;
+                    } else {
+                        state = CommentState::EndDash;
+                        consume = false;
+                    }
+                }
+                CommentState::BangDashDash => {
+                    state = CommentState::End;
+                    consume = false;
+                }
+                CommentState::EndDash => {
+                    if ch == '-' {
+                        state = CommentState::End;
+                    } else {
+                        data.push('-');
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                }
+                CommentState::End => match ch {
+                    '>' => {
+                        self.position += 1;
+                        break;
+                    }
+                    '!' => state = CommentState::EndBang,
+                    '-' => data.push('-'),
+                    _ => {
+                        data.push_str("--");
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                },
+                CommentState::EndBang => match ch {
+                    '-' => {
+                        data.push_str("--!");
+                        state = CommentState::EndDash;
+                    }
+                    '>' => {
+                        self.position += 1;
+                        break;
+                    }
+                    _ => {
+                        data.push_str("--!");
+                        state = CommentState::Data;
+                        consume = false;
+                    }
+                },
+            }
+            if consume {
+                self.position += ch.len_utf8();
+            }
+        }
+        Token::Comment(Cow::Owned(normalize(&data).into_owned()))
+    }
+
+    /// Read a quoted public or system identifier and report whether its quote closed.
+    fn identifier(&mut self) -> (Cow<'a, str>, bool) {
+        let quote = self.current().expect("identifier starts at a quote");
+        self.position += 1;
+        let start = self.position;
+        while self
+            .current()
+            .is_some_and(|byte| byte != quote && byte != b'>')
+        {
+            self.position += 1;
+        }
+        let value = replace_null(normalize(&self.source[start..self.position]));
+        let closed = self.current() == Some(quote);
+        if closed {
+            self.position += 1;
+        }
+        (value, closed)
+    }
+
+    /// Consume the remainder of a malformed document type declaration.
+    fn finish_doctype(&mut self, doctype: Doctype<'a>) -> Token<'a> {
+        while self.current().is_some_and(|byte| byte != b'>') {
+            self.position += 1;
+        }
+        if self.current().is_some() {
+            self.position += 1;
+        }
+        Token::Doctype(doctype)
+    }
+
+    /// Read a document type declaration, retaining its quirks flag and identifiers.
+    fn doctype(&mut self) -> Token<'a> {
+        let mut doctype = Doctype {
+            name: None,
+            public_id: None,
+            system_id: None,
+            force_quirks: false,
+        };
+        self.whitespace();
+        if matches!(self.current(), None | Some(b'>')) {
+            doctype.force_quirks = true;
+            return self.finish_doctype(doctype);
+        }
+        let start = self.position;
+        while self
+            .current()
+            .is_some_and(|byte| !is_space(byte) && byte != b'>')
+        {
+            self.position += 1;
+        }
+        doctype.name = Some(normalize_name(&self.source[start..self.position]));
+        self.whitespace();
+        match self.current() {
+            Some(b'>') => return self.finish_doctype(doctype),
+            None => {
+                doctype.force_quirks = true;
+                return Token::Doctype(doctype);
+            }
+            _ => {}
+        }
+        let keyword = self.source.as_bytes().get(self.position..self.position + 6);
+        let public = keyword.is_some_and(|value| value.eq_ignore_ascii_case(b"PUBLIC"));
+        let system = keyword.is_some_and(|value| value.eq_ignore_ascii_case(b"SYSTEM"));
+        if !public && !system {
+            doctype.force_quirks = true;
+            return self.finish_doctype(doctype);
+        }
+        self.position += 6;
+        self.whitespace();
+        if !matches!(self.current(), Some(b'\'' | b'"')) {
+            doctype.force_quirks = true;
+            return self.finish_doctype(doctype);
+        }
+        let (identifier, closed) = self.identifier();
+        if public {
+            doctype.public_id = Some(identifier);
+        } else {
+            doctype.system_id = Some(identifier);
+        }
+        if !closed {
+            doctype.force_quirks = true;
+            return self.finish_doctype(doctype);
+        }
+        self.whitespace();
+        if public {
+            match self.current() {
+                Some(b'\'' | b'"') => {
+                    let (identifier, closed) = self.identifier();
+                    doctype.system_id = Some(identifier);
+                    if !closed {
+                        doctype.force_quirks = true;
+                        return self.finish_doctype(doctype);
+                    }
+                    self.whitespace();
+                }
+                Some(b'>') => return self.finish_doctype(doctype),
+                _ => {
+                    doctype.force_quirks = true;
+                    return self.finish_doctype(doctype);
+                }
+            }
+        }
+        if self.current().is_none() {
+            doctype.force_quirks = true;
+        }
+        self.finish_doctype(doctype)
+    }
+
+    /// Read a processing instruction or recover it as a bogus comment.
+    fn processing_instruction(&mut self) -> Option<Token<'a>> {
+        let comment_start = self.position + 1;
+        self.position += 2;
+        let first = self.current()?;
+        if !first.is_ascii_alphabetic() && first != b'_' {
+            return Some(self.bogus_comment(comment_start));
+        }
+        let start = self.position;
+        while self
+            .current()
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            self.position += 1;
+        }
+        let target = &self.source[start..self.position];
+        let next = self.current()?;
+        if !(is_space(next) || matches!(next, b'?' | b'>'))
+            || target.eq_ignore_ascii_case("xml")
+            || target.eq_ignore_ascii_case("xml-stylesheet")
+        {
+            return Some(self.bogus_comment(comment_start));
+        }
+        self.whitespace();
+        let start = self.position;
+        while self.current().is_some_and(|byte| byte != b'>') {
+            self.position += 1;
+        }
+        self.current()?;
+        let end = if self.position > start && self.source.as_bytes()[self.position - 1] == b'?' {
+            self.position - 1
+        } else {
+            self.position
+        };
+        let data = normalize(&self.source[start..end]);
+        self.position += 1;
+        Some(Token::ProcessingInstruction {
+            target: Cow::Borrowed(target),
+            data,
+        })
+    }
+
+    /// Scan script text while accounting for escaped and double-escaped regions.
+    fn script_end(&self, start: usize) -> usize {
+        #[derive(Clone, Copy)]
+        enum Script {
+            Data,
+            Escaped,
+            Dash,
+            DashDash,
+            Double,
+            DoubleDash,
+            DoubleDashDash,
+        }
+        let bytes = self.source.as_bytes();
+        let mut at = start;
+        let mut state = Script::Data;
+        while at < bytes.len() {
+            let byte = bytes[at];
+            match state {
+                Script::Data => {
+                    if byte == b'<' && self.appropriate_end(at) {
+                        return at;
+                    }
+                    if bytes[at..].starts_with(b"<!--") {
+                        state = Script::DashDash;
+                        at += 4;
+                        continue;
+                    }
+                }
+                Script::Escaped | Script::Dash | Script::DashDash => {
+                    if byte == b'<' {
+                        if self.appropriate_end(at) {
+                            return at;
+                        }
+                        if bytes.get(at + 1).is_some_and(u8::is_ascii_alphabetic) {
+                            let word_start = at + 1;
+                            at = word_start;
+                            while bytes.get(at).is_some_and(u8::is_ascii_alphabetic) {
+                                at += 1;
+                            }
+                            state = if bytes
+                                .get(at)
+                                .is_some_and(|&b| is_space(b) || matches!(b, b'/' | b'>'))
+                                && bytes[word_start..at].eq_ignore_ascii_case(b"script")
+                            {
+                                Script::Double
+                            } else {
+                                Script::Escaped
+                            };
+                            continue;
+                        }
+                        state = Script::Escaped;
+                    } else if byte == b'-' {
+                        state = if matches!(state, Script::Escaped) {
+                            Script::Dash
+                        } else {
+                            Script::DashDash
+                        };
+                    } else if byte == b'>' && matches!(state, Script::DashDash) {
+                        state = Script::Data;
+                    } else {
+                        state = Script::Escaped;
+                    }
+                }
+                Script::Double | Script::DoubleDash | Script::DoubleDashDash => {
+                    if byte == b'<' {
+                        if bytes.get(at + 1) == Some(&b'/') {
+                            let word_start = at + 2;
+                            at = word_start;
+                            while bytes.get(at).is_some_and(u8::is_ascii_alphabetic) {
+                                at += 1;
+                            }
+                            state = if bytes
+                                .get(at)
+                                .is_some_and(|&b| is_space(b) || matches!(b, b'/' | b'>'))
+                                && bytes[word_start..at].eq_ignore_ascii_case(b"script")
+                            {
+                                Script::Escaped
+                            } else {
+                                Script::Double
+                            };
+                            continue;
+                        }
+                        state = Script::Double;
+                    } else if byte == b'-' {
+                        state = if matches!(state, Script::Double) {
+                            Script::DoubleDash
+                        } else {
+                            Script::DoubleDashDash
+                        };
+                    } else if byte == b'>' && matches!(state, Script::DoubleDashDash) {
+                        state = Script::Data;
+                    } else {
+                        state = Script::Double;
+                    }
+                }
+            }
+            at += 1;
+        }
+        at
+    }
+}
+
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            self.current()?;
+            let start = self.position;
+            match self.state {
+                State::Plaintext => {
+                    self.position = self.source.len();
+                    return Some(Token::Text(replace_null(normalize(&self.source[start..]))));
+                }
+                State::Cdata => {
+                    let rest = &self.source[start..];
+                    let end = rest.find("]]>").map_or(self.source.len(), |at| start + at);
+                    self.position = (end + 3).min(self.source.len());
+                    self.state = State::Data;
+                    if end > start {
+                        return Some(Token::Text(normalize(&self.source[start..end])));
+                    }
+                    continue;
+                }
+                State::Rcdata | State::Rawtext | State::ScriptData => {
+                    if self.appropriate_end(start) {
+                        self.state = State::Data;
+                        return self.tag(true);
+                    }
+                    let end = if self.state == State::ScriptData {
+                        self.script_end(start)
+                    } else {
+                        let mut end = start;
+                        while end < self.source.len() && !self.appropriate_end(end) {
+                            end += 1;
+                        }
+                        end
+                    };
+                    self.position = end;
+                    let text = if self.state == State::Rcdata {
+                        decode(&self.source[start..end], false)
+                    } else {
+                        normalize(&self.source[start..end])
+                    };
+                    return Some(Token::Text(replace_null(text)));
+                }
+                State::Data => {}
+            }
+            if self.current() != Some(b'<') {
+                let rest = &self.source.as_bytes()[start..];
+                let first = memchr3(b'<', b'&', b'\r', rest).unwrap_or(rest.len());
+                if first == rest.len() || rest[first] == b'<' {
+                    self.position += first;
+                    return Some(Token::Text(Cow::Borrowed(
+                        &self.source[start..self.position],
+                    )));
+                }
+                self.position = memchr(b'<', &rest[first..])
+                    .map_or(self.source.len(), |offset| start + first + offset);
+                return Some(Token::Text(decode(
+                    &self.source[start..self.position],
+                    false,
+                )));
+            }
+            let rest = &self.source.as_bytes()[start..];
+            match rest.get(1).copied() {
+                Some(byte) if byte.is_ascii_alphabetic() => return self.tag(false),
+                Some(b'/') => match rest.get(2).copied() {
+                    Some(byte) if byte.is_ascii_alphabetic() => return self.tag(true),
+                    Some(b'>') => {
+                        self.position += 3;
+                        continue;
+                    }
+                    None => {
+                        self.position += 2;
+                        return Some(Token::Text(Cow::Borrowed("</")));
+                    }
+                    _ => {
+                        self.position += 2;
+                        return Some(self.bogus_comment(start + 2));
+                    }
+                },
+                Some(b'!') => {
+                    self.position += 2;
+                    if rest.starts_with(b"<!--") {
+                        self.position += 2;
+                        return Some(self.comment());
+                    }
+                    if rest
+                        .get(2..9)
+                        .is_some_and(|keyword| keyword.eq_ignore_ascii_case(b"DOCTYPE"))
+                    {
+                        self.position += 7;
+                        return Some(self.doctype());
+                    }
+                    return Some(self.bogus_comment(start + 2));
+                }
+                Some(b'?') => return self.processing_instruction(),
+                _ => {
+                    self.position += 1;
+                    return Some(Token::Text(Cow::Borrowed("<")));
+                }
+            }
+        }
+    }
+}
+
+impl FusedIterator for Tokenizer<'_> {}
+
+/// Determine whether a byte is HTML whitespace before newline preprocessing.
+fn is_space(byte: u8) -> bool {
+    matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
+}
+
+/// Normalize a tag or attribute name without allocating for ordinary lowercase names.
+fn normalize_name(input: &str) -> Cow<'_, str> {
+    if input
+        .bytes()
+        .any(|byte| byte.is_ascii_uppercase() || byte == 0)
+    {
+        replace_null(Cow::Owned(input.to_ascii_lowercase()))
+    } else {
+        Cow::Borrowed(input)
+    }
+}
+
+/// Apply the null-character replacement required outside the data and CDATA states.
+fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
+    if input.contains('\0') {
+        Cow::Owned(input.replace('\0', "\u{fffd}"))
+    } else {
+        input
+    }
+}
