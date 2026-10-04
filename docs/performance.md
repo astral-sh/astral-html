@@ -1,10 +1,11 @@
 # Performance
 
-The benchmark compares parsing and uv's HTML field extraction with
-`astral-tl` 0.8.0. It verifies equal extracted output before measuring each
-input. Both implementations run in the same executable and use the same
-allocator. URL handling, package validation, network requests, and resolution
-are outside the measured work.
+The benchmark compares `astral-html` with `astral-tl` 0.8.0 by parsing HTML and
+extracting the fields used by uv into a shared owned representation. It verifies
+equal extracted output before measuring each input. Both implementations run
+in the same executable and use the same allocator. It does not time uv-client
+itself: URL handling, package validation, network requests, and resolution are
+outside the measured work.
 
 ## Current results
 
@@ -130,6 +131,12 @@ uv test inputs have pinned provenance and licenses. Larger indexes,
 attribute-heavy inputs, the long text node, and entity-heavy input are generated
 by the harness; they are not production traffic captures. The 32-fixture suite
 uses the same extraction modes as the compatibility tests.
+
+This shared extraction code does more work than uv in some cases. For root
+indexes it also extracts base/status fields and decodes each href, while uv
+checks href presence and reads project text. For project indexes it extracts
+both metadata attributes, while uv short-circuits the fallback. These extra
+operations run for both parsers.
 
 Results apply to the recorded source hashes, host, inputs, and allocator.
 

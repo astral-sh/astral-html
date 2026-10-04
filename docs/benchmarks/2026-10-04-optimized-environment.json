@@ -14,7 +14,7 @@
     "codegen_units": 1,
     "target_cpu_override": null
   },
-  "comparison": "astral-html and astral-tl 0.8.0 in the same executable, with the same allocator and equivalent owned uv field extraction; output equality checked before each case",
+  "comparison": "astral-html and astral-tl 0.8.0 in the same executable, with the same allocator and common owned extraction of the HTML fields used by uv; output equality checked before each case. This is not an end-to-end uv-client measurement; see docs/performance.md for extraction differences.",
   "build_environment": {
     "ohm_experimental_defaults": false,
     "unset": [
