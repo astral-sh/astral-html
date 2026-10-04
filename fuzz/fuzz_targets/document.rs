@@ -12,6 +12,7 @@ fuzz_target!(|bytes: &[u8]| {
         max_input_bytes: if selector & 1 == 0 { 16_384 } else { 128 },
         max_nodes: if selector & 2 == 0 { 4_096 } else { 16 },
         max_depth: if selector & 4 == 0 { 128 } else { 4 },
+        ..Limits::default()
     };
     if let Ok(document) = Document::parse_with_limits(source, limits) {
         let count = document.elements().count();

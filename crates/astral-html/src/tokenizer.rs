@@ -171,7 +171,11 @@ impl<'a> Tokenizer<'a> {
     }
 
     /// Read a tag, dropping incomplete tags at EOF as required by tokenization.
-    fn tag(&mut self, end: bool) -> Option<Token<'a>> {
+    fn tag(
+        &mut self,
+        end: bool,
+        remaining_attributes: &mut usize,
+    ) -> Option<Result<Token<'a>, crate::Error>> {
         self.position += if end { 2 } else { 1 };
         let name_start = self.position;
         while self
@@ -202,6 +206,10 @@ impl<'a> Tokenizer<'a> {
                 }
                 _ => {}
             }
+            if *remaining_attributes == 0 {
+                return Some(Err(crate::Error::AttributeLimit));
+            }
+            *remaining_attributes -= 1;
             let start = self.position;
             // An equals sign can be the first character of an attribute name.
             self.position += 1;
@@ -269,10 +277,10 @@ impl<'a> Tokenizer<'a> {
             self_closing,
         };
         if end {
-            Some(Token::EndTag(tag))
+            Some(Ok(Token::EndTag(tag)))
         } else {
             self.last_start_tag = can_end_text(&tag.name).then(|| tag.name.clone());
-            Some(Token::StartTag(tag))
+            Some(Ok(Token::StartTag(tag)))
         }
     }
 
@@ -413,7 +421,11 @@ impl<'a> Tokenizer<'a> {
                 self.position += ch.len_utf8();
             }
         }
-        Token::Comment(Cow::Owned(normalize(&data).into_owned()))
+        let data = match normalize(&data) {
+            Cow::Borrowed(_) => data,
+            Cow::Owned(normalized) => normalized,
+        };
+        Token::Comment(Cow::Owned(data))
     }
 
     /// Read a quoted public or system identifier and report whether its quote closed.
@@ -666,19 +678,21 @@ impl<'a> Tokenizer<'a> {
         }
         at
     }
-}
 
-impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Token<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    /// Read a token, checking each attribute before name or value allocation.
+    pub(crate) fn next_with_attribute_budget(
+        &mut self,
+        remaining_attributes: &mut usize,
+    ) -> Option<Result<Token<'a>, crate::Error>> {
         loop {
             self.current()?;
             let start = self.position;
             match self.state {
                 State::Plaintext => {
                     self.position = self.source.len();
-                    return Some(Token::Text(replace_null(normalize(&self.source[start..]))));
+                    return Some(Ok(Token::Text(replace_null(normalize(
+                        &self.source[start..],
+                    )))));
                 }
                 State::Cdata => {
                     let rest = &self.source[start..];
@@ -686,14 +700,14 @@ impl<'a> Iterator for Tokenizer<'a> {
                     self.position = (end + 3).min(self.source.len());
                     self.state = State::Data;
                     if end > start {
-                        return Some(Token::Text(normalize(&self.source[start..end])));
+                        return Some(Ok(Token::Text(normalize(&self.source[start..end]))));
                     }
                     continue;
                 }
                 State::Rcdata | State::Rawtext | State::ScriptData => {
                     if self.appropriate_end(start) {
                         self.state = State::Data;
-                        return self.tag(true);
+                        return self.tag(true, remaining_attributes);
                     }
                     let end = if self.state == State::ScriptData {
                         self.script_end(start)
@@ -710,7 +724,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     } else {
                         normalize(&self.source[start..end])
                     };
-                    return Some(Token::Text(replace_null(text)));
+                    return Some(Ok(Token::Text(replace_null(text))));
                 }
                 State::Data => {}
             }
@@ -719,57 +733,71 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let first = memchr3(b'<', b'&', b'\r', rest).unwrap_or(rest.len());
                 if first == rest.len() || rest[first] == b'<' {
                     self.position += first;
-                    return Some(Token::Text(Cow::Borrowed(
+                    return Some(Ok(Token::Text(Cow::Borrowed(
                         &self.source[start..self.position],
-                    )));
+                    ))));
                 }
                 self.position = memchr(b'<', &rest[first..])
                     .map_or(self.source.len(), |offset| start + first + offset);
-                return Some(Token::Text(decode(
+                return Some(Ok(Token::Text(decode(
                     &self.source[start..self.position],
                     false,
-                )));
+                ))));
             }
             let rest = &self.source.as_bytes()[start..];
             match rest.get(1).copied() {
-                Some(byte) if byte.is_ascii_alphabetic() => return self.tag(false),
+                Some(byte) if byte.is_ascii_alphabetic() => {
+                    return self.tag(false, remaining_attributes);
+                }
                 Some(b'/') => match rest.get(2).copied() {
-                    Some(byte) if byte.is_ascii_alphabetic() => return self.tag(true),
+                    Some(byte) if byte.is_ascii_alphabetic() => {
+                        return self.tag(true, remaining_attributes);
+                    }
                     Some(b'>') => {
                         self.position += 3;
                         continue;
                     }
                     None => {
                         self.position += 2;
-                        return Some(Token::Text(Cow::Borrowed("</")));
+                        return Some(Ok(Token::Text(Cow::Borrowed("</"))));
                     }
                     _ => {
                         self.position += 2;
-                        return Some(self.bogus_comment(start + 2));
+                        return Some(Ok(self.bogus_comment(start + 2)));
                     }
                 },
                 Some(b'!') => {
                     self.position += 2;
                     if rest.starts_with(b"<!--") {
                         self.position += 2;
-                        return Some(self.comment());
+                        return Some(Ok(self.comment()));
                     }
                     if rest
                         .get(2..9)
                         .is_some_and(|keyword| keyword.eq_ignore_ascii_case(b"DOCTYPE"))
                     {
                         self.position += 7;
-                        return Some(self.doctype());
+                        return Some(Ok(self.doctype()));
                     }
-                    return Some(self.bogus_comment(start + 2));
+                    return Some(Ok(self.bogus_comment(start + 2)));
                 }
-                Some(b'?') => return self.processing_instruction(),
+                Some(b'?') => return self.processing_instruction().map(Ok),
                 _ => {
                     self.position += 1;
-                    return Some(Token::Text(Cow::Borrowed("<")));
+                    return Some(Ok(Token::Text(Cow::Borrowed("<"))));
                 }
             }
         }
+    }
+}
+
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut remaining_attributes = usize::MAX;
+        self.next_with_attribute_budget(&mut remaining_attributes)
+            .map(|token| token.expect("an unbounded tokenizer cannot exhaust its attribute budget"))
     }
 }
 
@@ -803,5 +831,24 @@ fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
         Cow::Owned(input.replace('\0', "\u{fffd}"))
     } else {
         input
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Tokenizer;
+    use crate::Error;
+
+    #[test]
+    fn attribute_budget_stops_before_scanning_the_next_name() {
+        let source = "<a first='one' HREF='two&amp;three'>";
+        let mut tokenizer = Tokenizer::new(source);
+        let mut remaining_attributes = 1;
+        assert!(matches!(
+            tokenizer.next_with_attribute_budget(&mut remaining_attributes),
+            Some(Err(Error::AttributeLimit))
+        ));
+        assert_eq!(remaining_attributes, 0);
+        assert_eq!(tokenizer.position(), source.find("HREF").unwrap());
     }
 }

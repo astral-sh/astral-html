@@ -15,8 +15,11 @@ Small attribute lists use bounded duplicate-name scans. Larger lists use the sta
 | Input | 128 MiB |
 | Retained element and text nodes | 4,000,000 |
 | Simultaneously open non-void elements | 256 |
+| Parsed attribute occurrences | 1,000,000 |
 
-`Document::parse_with_limits` lets the caller choose different limits. Input size is checked before tokenization. Node and depth limits are checked before retaining the next node. A current token's attributes and decoded strings can already have been allocated by that point; these checks are not exact memory accounting or fallible allocation. Standard allocation failure retains Rust's process-level behavior.
+`Document::parse_with_limits` lets the caller choose different limits. Input size is checked before tokenization. The attribute budget counts every occurrence across the input, including duplicate names, end-tag attributes, and attributes in incomplete tags. Each occurrence is checked before normalizing its name or decoding its value. Markup-like text inside comments and text elements does not consume the attribute budget.
+
+Node and depth limits are checked before retaining the next node. The current token's strings and its attributes within the budget may already have been allocated by that point. These checks are not exact memory accounting or fallible allocation. Standard allocation failure retains Rust's process-level behavior.
 
 `Tokenizer` and `Reader` impose no input or token-size limit. Callers using them on untrusted responses should bound response bytes before parsing. They do not retain a document, but a single token can still contain a large attribute list or comment.
 
