@@ -126,7 +126,7 @@ fn comment_newlines_preserve_recovery_and_source_positions() {
 
 #[test]
 fn preserves_first_attributes_across_deduplication_threshold() {
-    for count in [0, 1, 7, 8, 9, 64, 1024] {
+    for count in [0, 1, 15, 16, 17, 64, 1024] {
         let mut source = String::from("<a");
         for index in 0..count {
             source.push_str(&format!(" attr{index}='{index}'"));
