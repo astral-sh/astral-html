@@ -20,6 +20,41 @@ fn distinguishes_boolean_and_empty_attributes() {
 }
 
 #[test]
+fn literal_less_than_runs_stop_at_markup() {
+    let prefix = "<<0 &amp;\r\n<é";
+    for suffix in [
+        "<a href=value>",
+        "</a>",
+        "<!--comment-->",
+        "<!DOCTYPE html>",
+        "<?target data>",
+        "</0>",
+        "</>tail",
+        "<?unfinished",
+        "</",
+        "",
+    ] {
+        let source = format!("{prefix}{suffix}");
+        let mut tokenizer = Tokenizer::new(&source);
+        assert_eq!(
+            tokenizer.next(),
+            Some(Token::Text(Cow::Borrowed("<<0 &\n<é"))),
+            "{source:?}"
+        );
+        assert_eq!(tokenizer.position(), prefix.len());
+        assert_eq!(
+            tokenizer.collect::<Vec<_>>(),
+            Tokenizer::new(suffix).collect::<Vec<_>>(),
+            "{source:?}"
+        );
+    }
+    let source = "<".repeat(65_536);
+    let mut tokenizer = Tokenizer::new(&source);
+    assert!(matches!(tokenizer.next(), Some(Token::Text(Cow::Borrowed(text))) if text == source));
+    assert!(tokenizer.next().is_none());
+}
+
+#[test]
 fn borrows_ordinary_source_fields() {
     let mut tokenizer = Tokenizer::new("<a href='package.whl'>package</a>");
     let Token::StartTag(tag) = tokenizer.next().unwrap() else {
