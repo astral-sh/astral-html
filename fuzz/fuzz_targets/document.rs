@@ -228,8 +228,8 @@ fuzz_target!(|bytes: &[u8]| {
         );
     }
 
-    // Reader output omits duplicates, end-tag attributes and incomplete tags.
-    // Its retained attributes are a lower bound, not an exact budget oracle.
+    // Retained elements omit duplicate names, end-tag attributes and incomplete
+    // tags, so their attributes are only a lower bound on the budget consumed.
     let budget = bytes.iter().fold(0_usize, |hash, &byte| {
         hash.rotate_left(1) ^ usize::from(byte)
     }) % 16;

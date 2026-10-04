@@ -99,7 +99,7 @@ pub enum Token<'a> {
     },
 }
 
-/// Stops tokenization when exhausted. Check the result after the token loop.
+/// Stops tokenization when exhausted. Call [`Self::check`] after the token loop.
 pub(crate) struct AttributeBudget {
     remaining: usize,
     exceeded: bool,
@@ -369,7 +369,6 @@ impl<'a> Tokenizer<'a> {
         self.comment_slow()
     }
 
-    /// Handle comment-state transitions and text normalization.
     #[inline(never)]
     fn comment_slow(&mut self) -> Token<'a> {
         #[derive(Clone, Copy)]
@@ -898,7 +897,6 @@ fn is_space(byte: u8) -> bool {
 /// Fold ASCII case and replace NUL in tag and attribute names.
 #[inline(never)]
 fn normalize_name(input: &str) -> Cow<'_, str> {
-    // Single-letter names can borrow their lowercase spelling.
     if let [byte @ b'A'..=b'Z'] = input.as_bytes() {
         let start = usize::from(byte - b'A');
         return Cow::Borrowed(&"abcdefghijklmnopqrstuvwxyz"[start..start + 1]);

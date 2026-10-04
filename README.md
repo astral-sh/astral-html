@@ -19,32 +19,24 @@ for element in document.elements().filter(|element| element.is("a")) {
 
 `Reader` selects HTML text modes automatically; `Tokenizer` accepts explicit context. `Document::parse_with_limits` bounds input bytes, nodes, nesting, and parsed attributes. Unchanged strings borrow from the input. The application chooses the allocator.
 
-## Validation
-
-- [Conformance](docs/conformance.md): 7,045 supported html5lib tokenizer runs pass; eight excluded cases are documented.
-- [uv compatibility](docs/uv.md): all 32 pinned inputs match astral-tl's extracted fields, and all 31 original uv HTML tests pass.
-- [Fuzzing](docs/fuzzing.md): five targets cover tokens, entities, reader state, document structure, and limits, including an independent tokenizer oracle.
-- [Performance](docs/performance.md): equivalent parse-and-extract benchmarks against astral-tl, including slower cases and source hashes.
-
-See [CI results](docs/ci.md), [resource limits](docs/safety.md), and the [hardening review](docs/hardening.md) for evidence and remaining work.
+- [Conformance](docs/conformance.md): tokenizer and document semantics.
+- [Resource limits](docs/safety.md): allocation and input bounds.
+- [uv integration](docs/uv.md): compatibility tests and adapter.
+- [Fuzzing](docs/fuzzing.md): targets, oracles, and commands.
+- [Benchmarks](docs/performance.md): equivalent parsing and extraction against astral-tl.
 
 The library is pre-release. Adoption in uv still requires its broader index and resolver integration tests.
 
 ## Development
 
 ```console
-cargo test --workspace --all-targets --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo bench -p astral-html --bench parse --features benchmark-jemalloc
+cargo test --workspace --all-targets --all-features --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo bench -p astral-html --bench parse --features benchmark-jemalloc --locked
 ```
 
-CI uses Namespace's Ubuntu 24.04 runners and tests AMD64 and ARM64 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, and AddressSanitizer fuzz smoke runs. On an Ohm development checkout, use `cargo +ohm` and keep a separate target directory for the checkout and shared build directory for the toolchain.
+CI uses Namespace's Ubuntu 24.04 runners to test AMD64 and ARM64 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, uv compatibility, and AddressSanitizer fuzz targets.
 
 ## License
 
-Licensed under either of
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
+Licensed under either [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.

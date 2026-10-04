@@ -10,7 +10,7 @@ The exclusions are:
 - Four cases exercise optional coercion into an XML infoset, which this library does not perform.
 - The corpus's parse-error diagnostics and positions are not compared. The tokenizer applies recovery rules but does not expose diagnostics.
 
-This includes malformed tags and attributes, duplicate attributes, comment recovery, document type identifiers and quirks flags, all named and numeric references, script escaping and double escaping, and processing instructions from the October 2026 standard. The independent fuzz oracle predates processing instructions; its narrower comparison is documented in [fuzzing.md](fuzzing.md).
+This includes malformed tags and attributes, duplicate attributes, comment recovery, document type identifiers and quirks flags, all named and numeric references, script escaping and double escaping, and processing instructions. The independent fuzz oracle predates processing instructions; its narrower comparison is documented in [fuzzing.md](fuzzing.md).
 
 ## Reader and document semantics
 
@@ -24,6 +24,6 @@ Names use ASCII case folding. Duplicate attributes keep the first normalized nam
 
 ## Compatibility bar
 
-All **32 pinned uv HTML inputs** must produce the same extracted fields as `astral-tl` 0.8.0. The comparison includes project metadata, base URLs, file attributes, boolean values, and root-index text. Additional tests vary name casing, whitespace, quoting, attribute order, and nesting. [uv.md](uv.md) describes the adapter changes and the upstream integration tests needed before replacing uv's dependency.
+All **32 pinned uv HTML inputs** must produce the same extracted fields as `astral-tl` 0.8.0. [uv.md](uv.md) describes the fields compared, the adapter, and the upstream integration tests needed before replacing uv's dependency.
 
 Malformed input follows the tokenization and lexical-scope rules above, which can differ from astral-tl.
