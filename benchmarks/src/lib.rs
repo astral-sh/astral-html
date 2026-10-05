@@ -9,7 +9,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const NATIVE_DOCUMENTS: &[&str] = &["astral-document", "astral-tl", "scraper"];
+pub const NATIVE_DOCUMENTS: &[&str] = &["astral-document", "tl", "scraper"];
 
 #[derive(Debug, Deserialize)]
 pub struct FixtureInfo {

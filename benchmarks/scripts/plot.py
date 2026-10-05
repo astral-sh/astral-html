@@ -14,7 +14,7 @@ SVG = "{http://www.w3.org/2000/svg}"
 ET.register_namespace("", SVG[1:-1])
 LABELS = {
     "astral-reader": "astral-html",
-    "astral-tl": "astral-tl",
+    "tl": "tl",
     "html5gum": "html5gum",
     "lol-html": "lol_html",
     "scraper": "scraper",
@@ -69,6 +69,12 @@ def render(rows, sessions, links, fixture, metadata, output):
         f"Source {metadata['git_before']['revision']}. {metadata['notes']}"
     )
     root.insert(1, description)
+    license_text = (WORKSPACE / "scripts/templates/LICENSE-RUFF").read_text().strip()
+    root.insert(2, ET.Comment(
+        "\nAdapted from Ruff's README benchmark SVG:\n"
+        "https://user-images.githubusercontent.com/1309177/232603516-4fb4892d-585c-4b20-b810-3db9161831e4.svg\n\n"
+        + license_text + "\n"
+    ))
 
     # Retain Ruff's 585×167 viewBox, 483×140 plot, 13px bars, font, and colors.
     width, height = 483, 140

@@ -46,15 +46,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "astral-tl"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04d4bb5df351abb6758a04240b0193794ddaf34a7c0b9452fab3c25dcce39e88"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -449,7 +440,6 @@ name = "html-benchmarks"
 version = "0.1.0"
 dependencies = [
  "astral-html",
- "astral-tl",
  "criterion",
  "html5ever",
  "html5gum",
@@ -458,6 +448,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tl",
 ]
 
 [[package]]
@@ -1086,6 +1077,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "tl"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b130bd8a58c163224b44e217b4239ca7b927d82bf6cc2fea1fc561d15056e3f7"
 
 [[package]]
 name = "typenum"

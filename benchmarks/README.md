@@ -6,8 +6,8 @@ A comparison workspace inspired by [string-rosetta-rs](https://github.com/rosett
 
 | Workload | Timed work | Implementations |
 | --- | --- | --- |
-| `extract-links` | Parse the input and return owned link records, then drop parser state and output. | astral-html Reader and Document, html5gum, astral-tl, scraper, lol_html |
-| `parse-document` | Construct and drop each parser's native retained document. | astral-html Document, astral-tl, scraper |
+| `extract-links` | Parse the input and return owned link records, then drop parser state and output. | astral-html Reader and Document, html5gum, tl, scraper, lol_html |
+| `parse-document` | Construct and drop each parser's native retained document. | astral-html Document, tl, scraper |
 
 A link record contains decoded `href`, `title`, and `rel` attributes for every `a` element with an `href`, in document order. Empty URLs are included. Missing optional attributes are `None`; boolean and explicitly empty attributes are `Some("")`. Values are decoded once. The task does not resolve URLs, parse `rel` tokens, collapse whitespace, or extract link text.
 
@@ -26,11 +26,13 @@ Versions are pinned in [Cargo.toml](Cargo.toml), with the complete dependency gr
 | astral-html Reader | Source-order events; disables scripting for text-state selection. |
 | astral-html Document | Retains lexical element scopes and borrows unchanged input. |
 | html5gum 0.8.4 | Selective callback emitter drops unused text/comments, with scanning acceleration enabled; selects the same HTML text states as Reader. |
-| astral-tl 0.8.0 | Lightweight retained document; raw attribute values require decoding. |
+| tl 0.7.8 | Upstream lightweight retained document with default features; raw attribute values require decoding. |
 | scraper 0.27.0 / html5ever 0.39.0 | Browser-style tree construction with scripting disabled; precompiled `a[href]` selector. |
 | lol_html 3.0.1 | Streaming `a[href]` handler with an empty serialization sink; retains the library's native scripting policy. |
 
-The astral-tl and lol_html adapters decode raw attributes using HTML character-reference tables from html5ever. This required conversion is timed. They do not use astral-html's decoder. Focused tests have independent expected records for attribute presence, references, duplicate attributes, and text contexts. Known native semantic differences are represented in those tests.
+The upstream tl crate has no default features. Its optional `simd` feature requires nightly Rust and is disabled here.
+
+The tl and lol_html adapters decode raw attributes using HTML character-reference tables from html5ever. This required conversion is timed. They do not use astral-html's decoder. Focused tests have independent expected records for attribute presence, references, duplicate attributes, and text contexts. Known native semantic differences are represented in those tests, including upstream tl's case-sensitive attribute names, boolean-attribute handling, and text states. These differences do not occur in the measured corpus; all five pages produce identical records.
 
 Before timing a corpus pair, the suite compares its complete owned records against scraper's output. Any mismatch remains in `eligibility.json` and the report with an explanation, and that pair is not timed. The same gate applies to native-document results. Inspect the eligibility matrix alongside timings; a skipped result is not a fast result. The reference is a practical extraction oracle, not a proof of parser conformance.
 

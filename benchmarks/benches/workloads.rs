@@ -68,7 +68,7 @@ fn workloads(criterion: &mut Criterion) {
                                 ))
                             });
                         }),
-                        "astral-tl" => group.bench_function(parser, |bencher| {
+                        "tl" => group.bench_function(parser, |bencher| {
                             bencher.iter(|| {
                                 drop(black_box(
                                     tl::parse(black_box(source), tl::ParserOptions::default())

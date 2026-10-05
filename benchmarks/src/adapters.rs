@@ -19,7 +19,7 @@ pub const IMPLEMENTATIONS: &[&str] = &[
     "astral-reader",
     "astral-document",
     "html5gum",
-    "astral-tl",
+    "tl",
     "scraper",
     "lol-html",
 ];
@@ -39,7 +39,7 @@ pub fn extract(parser: &str, input: &str) -> Result<Vec<Link>, String> {
         "astral-reader" => Ok(astral_reader(input)),
         "astral-document" => astral_document(input),
         "html5gum" => Ok(html5gum(input)),
-        "astral-tl" => astral_tl(input),
+        "tl" => tl(input),
         "scraper" => Ok(scraper(input)),
         "lol-html" => lol_html(input),
         _ => Err(format!("unknown parser: {parser}")),
@@ -202,7 +202,7 @@ fn html5gum(input: &str) -> Vec<Link> {
     output
 }
 
-fn astral_tl(input: &str) -> Result<Vec<Link>, String> {
+fn tl(input: &str) -> Result<Vec<Link>, String> {
     let document =
         tl::parse(input, tl::ParserOptions::default()).map_err(|error| error.to_string())?;
     Ok(document
@@ -387,19 +387,43 @@ mod tests {
     }
 
     #[test]
-    fn owned_records_preserve_order_case_folding_and_attribute_presence() {
-        assert_all(
-            "<div><A HREF='/first' href='/ignored' TITLE='hello' title='ignored' REL='tag'>one</A><span><a href='' title rel=''>two</a></span><a href>three</a><a title='ignored' rel='ignored'>skip</a></div>",
+    fn attribute_case_and_presence_differences_remain_visible() {
+        let input = "<div><A HREF='/first' href='/ignored' TITLE='hello' title='ignored' REL='tag'>one</A><span><a href='' title rel=''>two</a></span><a href>three</a><a title='ignored' rel='ignored'>skip</a></div>";
+        let expected = vec![
+            Link {
+                href: "/first".into(),
+                title: Some("hello".into()),
+                rel: Some("tag".into()),
+            },
+            Link {
+                href: "".into(),
+                title: Some("".into()),
+                rel: Some("".into()),
+            },
+            Link {
+                href: "".into(),
+                title: None,
+                rel: None,
+            },
+        ];
+        prepare();
+        for parser in IMPLEMENTATIONS.iter().filter(|&&parser| parser != "tl") {
+            assert_eq!(extract(parser, input).unwrap(), expected, "{parser}");
+        }
+        // Upstream tl preserves attribute case and, in this input, skips `rel`
+        // after the boolean `title`. Do not repair these native differences.
+        assert_eq!(
+            extract("tl", input).unwrap(),
             vec![
                 Link {
-                    href: "/first".into(),
-                    title: Some("hello".into()),
-                    rel: Some("tag".into()),
+                    href: "/ignored".into(),
+                    title: Some("ignored".into()),
+                    rel: None,
                 },
                 Link {
                     href: "".into(),
                     title: Some("".into()),
-                    rel: Some("".into()),
+                    rel: None,
                 },
                 Link {
                     href: "".into(),
@@ -442,14 +466,11 @@ mod tests {
             title: None,
             rel: None,
         }];
-        for parser in IMPLEMENTATIONS
-            .iter()
-            .filter(|&&parser| parser != "astral-tl")
-        {
+        for parser in IMPLEMENTATIONS.iter().filter(|&&parser| parser != "tl") {
             assert_eq!(extract(parser, input).unwrap(), expected, "{parser}");
         }
         // Native tl has no HTML text-state selection. Keep the mismatch visible.
-        assert_ne!(extract("astral-tl", input).unwrap(), expected);
+        assert_ne!(extract("tl", input).unwrap(), expected);
     }
 
     #[test]
