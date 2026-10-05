@@ -8,6 +8,11 @@ on:
         description: Exact Cargo version to release, without a leading v
         required: true
         type: string
+      dry-run:
+        description: Run validation without publishing
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: release
@@ -22,11 +27,11 @@ jobs:
   validate-release:
     name: Validate release
     if: github.repository == 'astral-sh/astral-html' && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -44,9 +49,8 @@ jobs:
           fi
 
           tag="v${VERSION}"
-          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
-            echo "::error::Tag ${tag} already exists"
-            exit 1
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            test "$(git rev-parse "refs/tags/${tag}^{commit}")" = "$GITHUB_SHA"
           fi
 
           echo "Preparing ${tag} from ${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
@@ -71,7 +75,8 @@ jobs:
     # N.B. This name should not change; the release environment gate relies on it.
     name: release-gate
     needs: validate-release
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-24.04
     environment:
       name: release-gate
     permissions: {}
@@ -81,14 +86,14 @@ jobs:
   publish-crates:
     name: Publish to crates.io
     needs: release-gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: release
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -136,18 +141,35 @@ jobs:
   publish-github:
     name: Create GitHub release
     needs: publish-crates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    environment: release
     permissions:
-      contents: write
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Get release token
+        id: release-token
+        uses: open-security-tools/ost-simple-sts@974a63a2daaaa40f7c6dec40d334f3da4421469e
+        with:
+          exchange-url: ${{ secrets.RELEASES_STS_API_URL }}/exchange
+          audience: ${{ secrets.RELEASES_STS_API_URL }}
+          repository: astral-sh/astral-html
+          # Tag the selected commit even if main advances across workflow changes.
+          permissions: |
+            contents: write
+            workflows: write
+
       - name: Create GitHub release and tag
         shell: bash
         run: |
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            exit 0
+          fi
           awk -v version="$VERSION" '
             $0 == "## " version { found = 1; next }
             found && /^## / { exit }
@@ -165,6 +187,7 @@ jobs:
             --notes-file "$RUNNER_TEMP/notes.txt" \
             "${prerelease[@]}"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_COMMIT: ${{ github.sha }}
           VERSION: ${{ inputs.version }}

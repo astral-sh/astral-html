@@ -7,11 +7,9 @@ from pathlib import Path
 
 def update_versions(root: Path) -> str:
     """Copy Rooster's new changelog version into the workspace manifest."""
-    heading = re.search(
-        r"^## (\d+\.\d+\.\d+)\s*$", (root / "CHANGELOG.md").read_text(), re.M
-    )
-    if heading is None:
-        raise ValueError("Missing stable release version in CHANGELOG.md")
+    heading = re.search(r"^## (.*)$", (root / "CHANGELOG.md").read_text(), re.M)
+    if heading is None or re.fullmatch(r"\d+\.\d+\.\d+", heading[1]) is None:
+        raise ValueError("Expected a stable version in the newest CHANGELOG.md heading")
     version = heading[1]
     manifest = root / "Cargo.toml"
     content = manifest.read_text()

@@ -15,19 +15,19 @@ Publishing for this repository's `release.yml` workflow and `release` environmen
 Crates.io authentication uses OIDC; this repository does not need a
 `CARGO_REGISTRY_TOKEN` secret.
 
-Release preparation uses Astral's existing credential broker and
-`astral-automations-bot` GitHub App, following Serc. Give the App access to this
-repository and create an `automations` environment restricted to `main` with:
+Give the existing `astral-automations-bot` and `astral-releases-bot` GitHub Apps
+access to this repository. Create an `automations` environment restricted to
+`main` and configure these secrets:
 
-| Secret | Value |
-| --- | --- |
-| `STS_API_URL` | The existing Astral credential-broker base URL, without `/exchange`. |
-| `OPENAI_API_KEY` | An API key for the Codex changelog rewrite. |
+| Environment | Secret | Value |
+| --- | --- | --- |
+| `automations` | `STS_API_URL` | Astral's automation-broker base URL, without `/exchange`. |
+| `automations` | `OPENAI_API_KEY` | An API key for the Codex changelog rewrite. |
+| `release` | `RELEASES_STS_API_URL` | Astral's release-broker base URL, without `/exchange`. |
 
-The broker reads `.github/secure-token-service.json` from `main`, so merge the
-policy before running preparation. It grants the preparation workflow access to
-create the release branch and pull request. No new broker deployment or App
-private-key secret is required.
+The brokers read `.github/secure-token-service.json` and
+`.github/secure-token-service-release.json` from `main`, so merge these policies
+before running the workflows.
 
 ### Prepare and publish
 
@@ -35,8 +35,9 @@ private-key secret is required.
    detection, or provide an exact stable Cargo version without a leading `v`.
    The first release defaults to the version already in `Cargo.toml`.
 2. Review the generated version changes and changelog, then merge the release PR.
-3. Run **Release** from `main` with the prepared version.
-4. Approve the protected `release-gate` deployment.
+3. Run **Release** from `main` with the prepared version. Select **Dry-run** to
+   validate the package and release notes without publishing.
+4. When publishing, approve the protected `release-gate` deployment.
 
 Preparation uses Rooster to classify merged pull requests and determine the next
 version. The `breaking` label selects a minor bump; other changes select a patch

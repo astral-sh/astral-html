@@ -22,6 +22,9 @@ def main() -> None:
     changelog = args.changelog.read_text(encoding="utf-8")
     candidate = args.candidate.read_text(encoding="utf-8").rstrip("\n")
     sections = changelog.split("\n## ", maxsplit=2)
+    headings = [line for line in candidate.splitlines() if line.startswith("## ")]
+    if len(sections) < 2 or headings != [f"## {sections[1].splitlines()[0]}"]:
+        raise ValueError("Replacement must contain exactly the newest release heading")
     preamble = sections[0]
     historical_releases = f"\n\n## {sections[2]}" if len(sections) == 3 else "\n"
     args.changelog.write_text(
