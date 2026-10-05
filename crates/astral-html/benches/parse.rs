@@ -1,16 +1,13 @@
-//! Measure parse-and-extract workloads.
-//!
-//! See docs/performance.md for inputs and configuration.
+//! Benchmarks for parsing and extracting the HTML fields consumed by uv.
+
+#![allow(missing_docs, reason = "Criterion macros generate public functions")]
 
 mod support;
 
 use std::fmt::Write;
 use std::hint::black_box;
-use std::time::{Duration, Instant};
 
-#[cfg(feature = "benchmark-jemalloc")]
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
 struct Case {
     name: &'static str,
@@ -18,167 +15,79 @@ struct Case {
     root_index: bool,
 }
 
-fn main() {
-    // Cargo adds `--bench` for benchmarks, but runs this binary without it for
-    // `cargo test --all-targets` when the libtest harness is disabled.
-    let test_mode = !std::env::args().any(|argument| argument == "--bench")
-        || std::env::args().any(|argument| argument == "--test");
-    let mut cases: Vec<Case> = match std::env::var("ASTRAL_HTML_BENCH_SUITE").as_deref() {
-        Ok("uv") => support::uv_fixtures()
-            .map(|(name, input, root_index)| Case {
-                name,
-                input: input.to_owned(),
-                root_index,
-            })
-            .collect(),
-        Ok("scanning") => scanning_cases(),
-        Ok("entity-scanning") => entity_scanning_cases(),
-        Err(std::env::VarError::NotPresent) | Ok("default") => vec![
-            Case {
-                name: "iniconfig-captured",
-                input: include_str!("fixtures/iniconfig.html").to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "codeartifact-uv",
-                input: include_str!("../tests/fixtures/uv/parse_code_artifact_index_html.html")
-                    .to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "flat-index-uv",
-                input: include_str!("../tests/fixtures/uv/parse_flat_index_html.html").to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "project-1000-generated",
-                input: project_index(1_000),
-                root_index: false,
-            },
-            Case {
-                name: "project-10000-generated",
-                input: project_index(10_000),
-                root_index: false,
-            },
-            Case {
-                name: "root-10000-generated",
-                input: root_index(10_000),
-                root_index: true,
-            },
-            Case {
-                name: "attributes-64-generated",
-                input: attribute_index(100, 64),
-                root_index: false,
-            },
-            Case {
-                name: "text-1m-generated",
-                input: format!("<html><body>{}<a href=/demo.whl>demo</a></body></html>", "x".repeat(1_048_576)),
-                root_index: false,
-            },
-            Case {
-                name: "entities-1000-generated",
-                input: format!("<html><body>{}</body></html>", r#"<a href="/demo.whl?x=&amp;&quot;&gt;&#65;&#x1F980;" data-requires-python="&gt;=3.9" data-yanked="broken &amp; withdrawn">demo</a>"#.repeat(1_000)),
-                root_index: false,
-            },
-        ],
-        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default, uv, scanning, or entity-scanning"),
-    };
-
-    if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
-        cases.retain(|case| case.name.contains(&filter));
+fn parse(c: &mut Criterion) {
+    let mut group = c.benchmark_group("parse-and-extract");
+    for case in cases() {
+        group.throughput(Throughput::Bytes(case.input.len() as u64));
+        group.bench_function(BenchmarkId::new("astral-html", case.name), |b| {
+            b.iter(|| {
+                black_box(support::parse(black_box(&case.input), case.root_index));
+            });
+        });
     }
-    assert!(!cases.is_empty(), "ASTRAL_HTML_BENCH_CASE matched no cases");
-    if test_mode {
-        for case in cases {
-            let index = black_box(support::parse(&case.input, case.root_index));
-            println!("{}: extracted {} links", case.name, index.links.len());
-        }
-        return;
-    }
-
-    let allocator = if cfg!(feature = "benchmark-jemalloc") {
-        "jemalloc"
-    } else {
-        "system"
-    };
-    if let Ok(profile) = std::env::var("ASTRAL_HTML_BENCH_PROFILE") {
-        assert_eq!(profile, "1", "ASTRAL_HTML_BENCH_PROFILE must be 1");
-        assert_eq!(
-            cases.len(),
-            1,
-            "profiling requires exactly one matching case"
-        );
-        let iterations = std::env::var("ASTRAL_HTML_BENCH_PROFILE_ITERATIONS")
-            .ok()
-            .map(|value| {
-                value
-                    .parse::<u64>()
-                    .expect("profile iterations is an integer")
-            })
-            .unwrap_or(100_000);
-        assert!(iterations > 0, "profile iterations must be positive");
-        let elapsed = measure(&cases[0], iterations);
-        println!(
-            "# profile allocator={allocator} case={} iterations={iterations} mean_ns={elapsed:.0}",
-            cases[0].name
-        );
-        return;
-    }
-
-    let sample_ms = std::env::var("ASTRAL_HTML_BENCH_SAMPLE_MS")
-        .ok()
-        .map(|value| value.parse::<u64>().expect("sample duration is an integer"))
-        .unwrap_or(100);
-    let samples = std::env::var("ASTRAL_HTML_BENCH_SAMPLES")
-        .ok()
-        .map(|value| value.parse::<usize>().expect("sample count is an integer"))
-        .unwrap_or(21);
-    assert!(sample_ms > 0 && samples >= 3);
-    let target = Duration::from_millis(sample_ms);
-
-    println!("# astral-html parse and uv field extraction");
-    println!("# allocator={allocator} samples={samples} warmup_ms={sample_ms}");
-    println!(
-        "case,bytes,links,astral_html_ns,astral_html_mib_s,astral_html_p10_ns,astral_html_p90_ns"
-    );
-    for case in cases {
-        let links = support::parse(&case.input, case.root_index).links.len();
-
-        // Warm up before selecting the iteration count.
-        let warm_start = Instant::now();
-        let mut iterations = 0_u64;
-        while warm_start.elapsed() < target {
-            black_box(support::parse(black_box(&case.input), case.root_index));
-            iterations += 1;
-        }
-        iterations = iterations.max(1);
-
-        let mut timings = Vec::with_capacity(samples);
-        for _ in 0..samples {
-            timings.push(measure(&case, iterations));
-        }
-        timings.sort_unstable_by(f64::total_cmp);
-        let median = timings[samples / 2];
-        println!(
-            "{},{},{},{median:.0},{:.1},{:.0},{:.0}",
-            case.name,
-            case.input.len(),
-            links,
-            case.input.len() as f64 / median * 1e9 / (1024.0 * 1024.0),
-            timings[samples / 10],
-            timings[samples * 9 / 10],
-        );
-    }
+    group.finish();
 }
 
-/// Mean nanoseconds per parse-and-extract, including destruction of its output.
-#[inline(never)]
-fn measure(case: &Case, iterations: u64) -> f64 {
-    let start = Instant::now();
-    for _ in 0..iterations {
-        black_box(support::parse(black_box(&case.input), case.root_index));
-    }
-    start.elapsed().as_nanos() as f64 / iterations as f64
+fn cases() -> Vec<Case> {
+    let mut cases = vec![
+        Case {
+            name: "iniconfig-captured",
+            input: include_str!("fixtures/iniconfig.html").to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "codeartifact-uv",
+            input: include_str!("../tests/fixtures/uv/parse_code_artifact_index_html.html")
+                .to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "flat-index-uv",
+            input: include_str!("../tests/fixtures/uv/parse_flat_index_html.html").to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "project-1000-generated",
+            input: project_index(1_000),
+            root_index: false,
+        },
+        Case {
+            name: "project-10000-generated",
+            input: project_index(10_000),
+            root_index: false,
+        },
+        Case {
+            name: "root-10000-generated",
+            input: root_index(10_000),
+            root_index: true,
+        },
+        Case {
+            name: "attributes-64-generated",
+            input: attribute_index(100, 64),
+            root_index: false,
+        },
+        Case {
+            name: "text-1m-generated",
+            input: format!("<html><body>{}<a href=/demo.whl>demo</a></body></html>", "x".repeat(1_048_576)),
+            root_index: false,
+        },
+        Case {
+            name: "entities-1000-generated",
+            input: format!("<html><body>{}</body></html>", r#"<a href="/demo.whl?x=&amp;&quot;&gt;&#65;&#x1F980;" data-requires-python="&gt;=3.9" data-yanked="broken &amp; withdrawn">demo</a>"#.repeat(1_000)),
+            root_index: false,
+        },
+    ];
+    cases.extend(
+        support::uv_fixtures().map(|(name, input, root_index)| Case {
+            name,
+            input: input.to_owned(),
+            root_index,
+        }),
+    );
+    cases.extend(scanning_cases());
+    cases.extend(entity_scanning_cases());
+
+    cases
 }
 
 fn project_index(count: usize) -> String {
@@ -314,3 +223,6 @@ fn entity_scanning_cases() -> Vec<Case> {
         ("text-prefix-64k-generated", format!("{}&amp;<a href=/demo.whl>demo</a>", "x".repeat(65_536))),
     ].into_iter().map(|(name, input)| Case {name, input, root_index: false}).collect()
 }
+
+criterion_group!(benches, parse);
+criterion_main!(benches);

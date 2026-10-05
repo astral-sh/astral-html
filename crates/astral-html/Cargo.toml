@@ -8,18 +8,13 @@ repository.workspace = true
 readme = "../../README.md"
 description = "A high-performance HTML parser designed for document traversal."
 
-[features]
-benchmark-jemalloc = ["dep:tikv-jemallocator"]
-
 [dependencies]
 memchr.workspace = true
-
-[target.'cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
-tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["background_threads_runtime_support"], optional = true }
 
 [dev-dependencies]
 insta = { version = "1.48.0", default-features = false }
 serde_json.workspace = true
+criterion.workspace = true
 
 [lints]
 workspace = true

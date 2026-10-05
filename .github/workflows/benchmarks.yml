@@ -1,0 +1,43 @@
+name: Benchmarks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codspeed:
+    name: CodSpeed
+    if: github.repository == 'astral-sh/astral-html'
+    runs-on: github-ubuntu-24.04-x86_64-4
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: '1.97.1'
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install cargo-codspeed
+        run: cargo install cargo-codspeed --version 5.0.1 --locked
+      - name: Build benchmarks
+        run: cargo codspeed build -m simulation -m memory --profile profiling -p astral-html --bench parse --locked
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        with:
+          mode: simulation,memory
+          run: cargo codspeed run --bench parse
