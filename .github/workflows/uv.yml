@@ -22,7 +22,7 @@ concurrency:
 jobs:
   uv-client:
     name: uv-client HTML tests
-    runs-on: nscloud-ubuntu-24.04-amd64-4x8
+    runs-on: ${{ github.repository_owner == 'astral-sh' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     env:
       RUSTUP_TOOLCHAIN: '1.97.1'
