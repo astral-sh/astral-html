@@ -8,6 +8,8 @@ use memchr::{memchr, memchr_iter, memchr2, memchr3, memmem};
 
 use crate::entities::{decode, decode_from, normalize};
 
+const MAX_RETAINED_ATTRIBUTE_CAPACITY: usize = 256;
+
 /// A tokenizer state selected by the caller or a tree builder.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub enum State {
@@ -109,7 +111,7 @@ pub struct Tokenizer<'a> {
     position: usize,
     state: State,
     last_start_tag: Option<Cow<'static, str>>,
-    // Only large tags need an index; keep its allocation for subsequent tags.
+    // Only large tags need an index; retain ordinary allocations for subsequent tags.
     attribute_names: Option<HashSet<Cow<'a, str>>>,
 }
 
@@ -307,7 +309,12 @@ impl<'a> Tokenizer<'a> {
             }
         }
         if let Some(seen) = &mut self.attribute_names {
-            seen.clear();
+            // Clearing a populated set takes O(capacity), so do not retain oversized tables.
+            if seen.capacity() > MAX_RETAINED_ATTRIBUTE_CAPACITY {
+                self.attribute_names = None;
+            } else {
+                seen.clear();
+            }
         }
         Some((attributes, self_closing))
     }
@@ -1036,7 +1043,43 @@ fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
 mod tests {
     use std::borrow::Cow;
 
-    use super::{normalize_text, replace_null};
+    use super::{MAX_RETAINED_ATTRIBUTE_CAPACITY, Token, Tokenizer, normalize_text, replace_null};
+
+    #[test]
+    fn ordinary_attribute_tables_retain_capacity() {
+        let attributes: String = (0..64).map(|index| format!(" attr{index}=value")).collect();
+        let source = format!("<a{attributes}><b{attributes}>");
+        let mut tokenizer = Tokenizer::new(&source);
+        let mut capacity = None;
+        for _ in 0..2 {
+            let Some(Token::StartTag(tag)) = tokenizer.next() else {
+                panic!("expected start tag");
+            };
+            assert_eq!(tag.attributes.len(), 64);
+            let seen = tokenizer.attribute_names.as_ref().unwrap();
+            assert!(seen.is_empty());
+            assert!(seen.capacity() >= 64 && seen.capacity() <= MAX_RETAINED_ATTRIBUTE_CAPACITY);
+            assert_eq!(*capacity.get_or_insert(seen.capacity()), seen.capacity());
+        }
+    }
+
+    #[test]
+    fn oversized_attribute_tables_are_not_retained() {
+        let count = MAX_RETAINED_ATTRIBUTE_CAPACITY + 1;
+        let attributes: String = (0..count)
+            .map(|index| format!(" ATTR{index}={index}"))
+            .collect();
+        let source = format!("<a{attributes} attr0=duplicate>");
+        let mut tokenizer = Tokenizer::new(&source);
+        let Some(Token::StartTag(tag)) = tokenizer.next() else {
+            panic!("expected start tag");
+        };
+        assert!(tokenizer.attribute_names.is_none());
+        assert_eq!(tag.attributes.len(), count);
+        assert_eq!(tag.attributes[0].name, "attr0");
+        assert_eq!(tag.attributes[0].value, "0");
+        assert_eq!(tag.attributes[count - 1].name, format!("attr{}", count - 1));
+    }
 
     #[test]
     fn combined_text_normalization_preserves_unicode_and_newlines() {
