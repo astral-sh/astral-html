@@ -1,8 +1,13 @@
 # astral-html
 
+[![Crates.io](https://img.shields.io/crates/v/astral-html.svg)](https://crates.io/crates/astral-html)
+
 A high-performance HTML parser designed for document traversal.
 
-astral-html provides a borrowed event reader and immutable document views. It implements HTML tokenization and recovery without browser tree construction, mutation, or serialization.
+> [!WARNING]
+>
+> This README was written by a human, but all code changes, PR summaries, and
+> additional documentation were authored entirely by GPT-6 Astra in Codex.
 
 <p align="center">
   <picture align="center">
@@ -13,9 +18,15 @@ astral-html provides a borrowed event reader and immutable document views. It im
 </p>
 
 <p align="center">
-  <i>Extracting 2,099 links from the PEP index with warm input on a shared AMD EPYC VM; astral-html uses Reader.
-  <a href="https://github.com/viarius-experiments/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md">Measurements and methodology</a>.</i>
+  <i>Extracting 2,000 anchor links from a Simple API-compatible index</i>
 </p>
+
+## Example usage
+
+Use `Document` to traverse elements and extract text and attributes, or `Reader`
+to process HTML as a stream of tokens.
+
+For example, to extract links from a document:
 
 ```rust
 use astral_html::Document;
@@ -30,24 +41,22 @@ for element in document.elements().filter(|element| element.is("a")) {
 }
 ```
 
-`Reader` selects HTML text modes automatically; `Tokenizer` accepts explicit context. `Document::parse_with_limits` bounds input bytes, nodes, nesting, and parsed attributes. Unchanged strings borrow from the input. The application chooses the allocator.
+To extract link URLs without building a document, use `Reader`:
 
-- [Conformance](docs/conformance.md): tokenizer and document semantics.
-- [Resource limits](docs/safety.md): allocation and input bounds.
-- [Fuzzing](docs/fuzzing.md): targets, oracles, and commands.
-- [Benchmarks](docs/performance.md): parsing and field extraction workloads.
+```rust
+use astral_html::{Reader, Token};
 
-The library is pre-release.
+let source = r#"<a href="/guide">Read the guide</a>"#;
 
-## Development
-
-```console
-cargo test --workspace --all-targets --all-features --locked
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo bench -p astral-html --bench parse --features benchmark-jemalloc --locked
+for token in Reader::new(source) {
+    if let Token::StartTag(tag) = token
+        && tag.name == "a"
+        && let Some(href) = tag.attributes.iter().find(|attr| attr.name == "href")
+    {
+        println!("{}", href.value());
+    }
+}
 ```
-
-CI tests AMD64 and ARM64 on Ubuntu 24.04 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, and AddressSanitizer fuzz targets.
 
 ## License
 
@@ -55,13 +64,14 @@ astral-html is licensed under either of
 
 - Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
   <https://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or
+  <https://opensource.org/licenses/MIT>)
 
 at your option.
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in astral-html
-by you, as defined in the Apache-2.0 license, shall be dually licensed as above, without any
-additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in astral-html by you, as defined in the Apache-2.0 license, shall
+be dually licensed as above, without any additional terms or conditions.
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
