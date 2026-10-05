@@ -6,11 +6,6 @@ A high-performance HTML parser designed for document traversal.
 
 ## Benchmarks
 
-Times are in **microseconds (µs)**; lower is better. Each value is the median of
-three session means, measured with warm input and the system allocator on a
-shared AMD EPYC-Milan VM. See the [methodology and raw results](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md)
-for the corpus, dependency versions, compiler, and reproduction instructions.
-
 ### Link extraction
 
 Parse HTML, collect owned `href`, `title`, and `rel` attributes from links, and
@@ -24,6 +19,8 @@ drop the output. astral-html uses `Reader`.
 | lol_html | 17.08 | 65.32 | 284.96 | 527.90 | 2,857.74 |
 | scraper | 66.81 | 399.16 | 1,589.29 | 3,193.92 | 11,346.75 |
 
+<sub>Times in microseconds (µs); lower is better. Median of three session means with warm input and the system allocator on a shared AMD EPYC-Milan VM. [Methodology and raw results](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
+
 ### Document construction
 
 Parse HTML into each library's native document and drop it. astral-html uses
@@ -35,6 +32,8 @@ while scraper performs HTML tree construction.
 | astral-html | 5.46 | 35.41 | 147.94 | 325.13 | 1,024.94 |
 | tl | 8.23 | 48.86 | 192.51 | 394.16 | 1,124.35 |
 | scraper | 63.11 | 378.35 | 1,570.03 | 3,090.82 | 9,958.86 |
+
+<sub>Times in microseconds (µs); lower is better. Median of three session means with warm input and the system allocator on a shared AMD EPYC-Milan VM. [Methodology and raw results](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
 
 > [!WARNING]
 >
