@@ -744,6 +744,7 @@ impl<'a> Tokenizer<'a> {
     /// Read the next token, reusing the supplied attribute buffer when possible.
     ///
     /// The attribute buffer must be empty; returned tags may take ownership of it.
+    #[inline(always)]
     pub(crate) fn next_with_attribute_buffer(
         &mut self,
         attribute_buffer: &mut Vec<Attribute<'a>>,
