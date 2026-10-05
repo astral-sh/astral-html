@@ -8,7 +8,9 @@ The source SHA-256 is checked before parsing; no source code is executed.
 import ast
 import hashlib
 import pathlib
+import string
 import sys
+import textwrap
 
 SOURCE_SHA256 = "d9c65fb2828dbc1f3e399058a341d51e9375ec5bca95a8e92599c41bd5b78bde"
 
@@ -33,6 +35,27 @@ def main():
     for name, value in sorted(table.items()):
         escaped = "".join(f"\\u{{{ord(char):x}}}" for char in value)
         output.append(f'    ("{name}", "{escaped}"),')
+    output.append("];")
+    names = sorted(table)
+    offsets = [
+        next((index for index, name in enumerate(names) if name[0] >= initial), len(names))
+        for initial in string.ascii_uppercase + string.ascii_lowercase
+    ] + [len(names)]
+    output.extend(
+        [
+            "",
+            "/// Start offsets for uppercase, then lowercase initial letters, with a sentinel.",
+            "pub(super) static INITIAL_OFFSETS: &[u16; 53] = &[",
+        ]
+    )
+    output.extend(
+        textwrap.wrap(
+            ", ".join(map(str, offsets)) + ",",
+            width=99,
+            initial_indent="    ",
+            subsequent_indent="    ",
+        )
+    )
     output.append("];")
     path = pathlib.Path(__file__).resolve().parents[1] / "crates/astral-html/src/entities_data.rs"
     path.write_text("\n".join(output) + "\n")
