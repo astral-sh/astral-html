@@ -151,6 +151,12 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
             }
             return Some((length, Replacement::Named(NAMED[index].1)));
         }
+        // Every legacy name also has a semicolon-terminated spelling. After
+        // this exact lookup fails, any shorter match would therefore be
+        // followed by an ASCII letter or digit, which attributes disallow.
+        if attribute {
+            return None;
+        }
     }
     None
 }
@@ -252,7 +258,16 @@ mod tests {
     fn every_named_reference_decodes() {
         assert_eq!(NAMED.len(), 2231);
         for &(name, expected) in NAMED {
-            assert_eq!(decode(&format!("&{name}"), false), expected, "{name}");
+            for attribute in [false, true] {
+                assert_eq!(decode(&format!("&{name}"), attribute), expected, "{name}");
+            }
+            if !name.ends_with(';') {
+                let terminated = format!("{name};");
+                assert!(
+                    NAMED.contains(&(terminated.as_str(), expected)),
+                    "missing terminated spelling for {name}"
+                );
+            }
         }
     }
 }
