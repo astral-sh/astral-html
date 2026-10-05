@@ -130,6 +130,19 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
         return Some((end, Replacement::Character(numeric(number))));
     }
 
+    // Common semicolon-terminated references need no contextual lookahead.
+    let common = match bytes {
+        [b'g', b't', b';', ..] => Some((3, ">")),
+        [b'l', b't', b';', ..] => Some((3, "<")),
+        [b'a', b'm', b'p', b';', ..] => Some((4, "&")),
+        [b'q', b'u', b'o', b't', b';', ..] => Some((5, "\"")),
+        [b'a', b'p', b'o', b's', b';', ..] => Some((5, "'")),
+        _ => None,
+    };
+    if let Some((length, value)) = common {
+        return Some((length, Replacement::Named(value)));
+    }
+
     // Bound unknown names by the longest WHATWG reference (32 bytes including `;`).
     let mut end = 0;
     while end < 32 && bytes.get(end).is_some_and(u8::is_ascii_alphanumeric) {
