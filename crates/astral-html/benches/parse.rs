@@ -266,6 +266,13 @@ fn scanning_cases() -> Vec<Case> {
             ),
         ),
         (
+            "comment-punctuation-generated",
+            format!(
+                "<!--{}-->",
+                "Build metadata for source-map records <metadata> includes café.\n".repeat(128)
+            ),
+        ),
+        (
             "comment-complex-generated",
             format!(
                 "<!--{}-->",
