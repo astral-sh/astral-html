@@ -5,7 +5,9 @@
 //! retains lexical element scopes for repeated queries, with configurable [`Limits`].
 //!
 //! Input must already be decoded UTF-8. Unchanged strings borrow from that input.
-//! The parser does not implement browser tree construction.
+//! The parser does not implement browser tree construction or track SVG/MathML
+//! namespaces. It can treat markup as text where a browser creates elements.
+//! Do not use it to decide whether HTML is safe to render.
 
 mod document;
 mod entities;

@@ -73,7 +73,8 @@ pub struct Doctype<'a> {
     pub public_id: Option<Cow<'a, str>>,
     /// The system identifier, if present.
     pub system_id: Option<Cow<'a, str>>,
-    /// Whether the declaration requires quirks mode.
+    /// Whether the tokenizer requires quirks mode. `false` does not imply
+    /// standards mode; a tree builder also checks the doctype name and identifiers.
     pub force_quirks: bool,
 }
 
