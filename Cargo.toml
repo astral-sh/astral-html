@@ -13,8 +13,6 @@ repository = "https://github.com/viarius-experiments/astral-html"
 [workspace.dependencies]
 memchr = { version = "2.7.4", default-features = false, features = ["std"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-astral-tl = { version = "=0.8.0", default-features = false }
-html-escape = { version = "0.2.13", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

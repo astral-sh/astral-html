@@ -33,10 +33,10 @@ See [conformance](conformance.md) for recovery and document semantics.
 
 ## Compatibility tests
 
-`crates/astral-html/tests/uv.rs` compares extracted fields against astral-tl for
-all [32 pinned inputs](../crates/astral-html/tests/fixtures/uv/README.md) from
-uv's 31 HTML tests. It covers base URLs, project metadata, link attributes,
-boolean values, and root-index text.
+Compatibility is checked by running uv's 31 upstream HTML tests against the
+adapter. The [32 pinned inputs](../crates/astral-html/tests/fixtures/uv/README.md)
+from those tests remain available as benchmark fixtures. The crate's own tests
+cover generic parser behavior with snapshots and direct assertions.
 
 The [adapter patch](uv-integration.patch) replaces the parser in that uv
 revision and removes the second entity-decoding step and uv-client's
@@ -57,6 +57,6 @@ including HTTP, caching, and URL-resolution interactions. Set response-byte and
 decompression bounds before parsing and choose [parser limits](safety.md) for
 the expected response concurrency.
 
-The [benchmarks](performance.md) compare equivalent HTML extraction with the
+The [benchmarks](performance.md) measure HTML extraction with the
 system allocator or jemalloc. URL validation, packaging, HTTP, and resolver work
 are outside their scope. Allocator selection remains the application's choice.

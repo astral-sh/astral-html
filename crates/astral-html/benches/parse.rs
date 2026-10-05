@@ -1,14 +1,13 @@
-//! Compare equivalent parse-and-extract workloads in one process.
+//! Measure parse-and-extract workloads.
 //!
 //! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
 //! names, comments, and scripts; `entity-scanning` covers references and long
 //! text prefixes. The default suite includes captured and generated
 //! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
-//! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=astral|baseline`.
+//! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=1`.
 //! `ASTRAL_HTML_BENCH_PROFILE_ITERATIONS` sets a positive iteration count (default: 100000).
-//! Profiling requires `--bench` and skips output comparison.
+//! Profiling requires `--bench`.
 
-#[path = "../tests/support/mod.rs"]
 mod support;
 
 use std::fmt::Write;
@@ -95,22 +94,26 @@ fn main() {
         cases.retain(|case| case.name.contains(&filter));
     }
     assert!(!cases.is_empty(), "ASTRAL_HTML_BENCH_CASE matched no cases");
+    if test_mode {
+        for case in cases {
+            let index = black_box(support::parse(&case.input, case.root_index));
+            println!("{}: extracted {} links", case.name, index.links.len());
+        }
+        return;
+    }
+
     let allocator = if cfg!(feature = "benchmark-jemalloc") {
         "jemalloc"
     } else {
         "system"
     };
-    if !test_mode && let Ok(parser) = std::env::var("ASTRAL_HTML_BENCH_PROFILE") {
+    if let Ok(profile) = std::env::var("ASTRAL_HTML_BENCH_PROFILE") {
+        assert_eq!(profile, "1", "ASTRAL_HTML_BENCH_PROFILE must be 1");
         assert_eq!(
             cases.len(),
             1,
             "profiling requires exactly one matching case"
         );
-        let parse: fn(&str, bool) -> support::Index = match parser.as_str() {
-            "astral" => support::astral,
-            "baseline" => support::baseline,
-            _ => panic!("ASTRAL_HTML_BENCH_PROFILE must be astral or baseline"),
-        };
         let iterations = std::env::var("ASTRAL_HTML_BENCH_PROFILE_ITERATIONS")
             .ok()
             .map(|value| {
@@ -120,9 +123,9 @@ fn main() {
             })
             .unwrap_or(100_000);
         assert!(iterations > 0, "profile iterations must be positive");
-        let elapsed = measure(&cases[0], iterations, parse);
+        let elapsed = measure(&cases[0], iterations);
         println!(
-            "# profile parser={parser} allocator={allocator} case={} iterations={iterations} mean_ns={elapsed:.0}",
+            "# profile allocator={allocator} case={} iterations={iterations} mean_ns={elapsed:.0}",
             cases[0].name
         );
         return;
@@ -142,69 +145,44 @@ fn main() {
     println!("# astral-html parse and uv field extraction");
     println!("# allocator={allocator} samples={samples} warmup_ms={sample_ms}");
     println!(
-        "case,bytes,links,astral_html_ns,astral_tl_ns,speedup,astral_html_mib_s,astral_html_p10_ns,astral_html_p90_ns,astral_tl_p10_ns,astral_tl_p90_ns"
+        "case,bytes,links,astral_html_ns,astral_html_mib_s,astral_html_p10_ns,astral_html_p90_ns"
     );
     for case in cases {
-        let expected = support::baseline(&case.input, case.root_index);
-        assert_eq!(
-            support::astral(&case.input, case.root_index),
-            expected,
-            "{}",
-            case.name
-        );
-        let links = expected.links.len();
-        if test_mode {
-            println!("{}: extracted {links} matching links", case.name);
-            continue;
-        }
+        let links = support::parse(&case.input, case.root_index).links.len();
 
-        // Warm both implementations before selecting the common iteration count.
+        // Warm up before selecting the iteration count.
         let warm_start = Instant::now();
         let mut iterations = 0_u64;
         while warm_start.elapsed() < target {
-            black_box(support::astral(black_box(&case.input), case.root_index));
-            black_box(support::baseline(black_box(&case.input), case.root_index));
+            black_box(support::parse(black_box(&case.input), case.root_index));
             iterations += 1;
         }
         iterations = iterations.max(1);
 
-        let mut astral = Vec::with_capacity(samples);
-        let mut baseline = Vec::with_capacity(samples);
-        for sample in 0..samples {
-            // Alternate order so neither parser consistently follows the other.
-            if sample % 2 == 0 {
-                astral.push(measure(&case, iterations, support::astral));
-                baseline.push(measure(&case, iterations, support::baseline));
-            } else {
-                baseline.push(measure(&case, iterations, support::baseline));
-                astral.push(measure(&case, iterations, support::astral));
-            }
+        let mut timings = Vec::with_capacity(samples);
+        for _ in 0..samples {
+            timings.push(measure(&case, iterations));
         }
-        astral.sort_unstable_by(f64::total_cmp);
-        baseline.sort_unstable_by(f64::total_cmp);
-        let candidate = astral[samples / 2];
-        let reference = baseline[samples / 2];
+        timings.sort_unstable_by(f64::total_cmp);
+        let median = timings[samples / 2];
         println!(
-            "{},{},{},{candidate:.0},{reference:.0},{:.3},{:.1},{:.0},{:.0},{:.0},{:.0}",
+            "{},{},{},{median:.0},{:.1},{:.0},{:.0}",
             case.name,
             case.input.len(),
             links,
-            reference / candidate,
-            case.input.len() as f64 / candidate * 1e9 / (1024.0 * 1024.0),
-            astral[samples / 10],
-            astral[samples * 9 / 10],
-            baseline[samples / 10],
-            baseline[samples * 9 / 10],
+            case.input.len() as f64 / median * 1e9 / (1024.0 * 1024.0),
+            timings[samples / 10],
+            timings[samples * 9 / 10],
         );
     }
 }
 
 /// Mean nanoseconds per parse-and-extract, including destruction of its output.
 #[inline(never)]
-fn measure(case: &Case, iterations: u64, parse: fn(&str, bool) -> support::Index) -> f64 {
+fn measure(case: &Case, iterations: u64) -> f64 {
     let start = Instant::now();
     for _ in 0..iterations {
-        black_box(parse(black_box(&case.input), case.root_index));
+        black_box(support::parse(black_box(&case.input), case.root_index));
     }
     start.elapsed().as_nanos() as f64 / iterations as f64
 }

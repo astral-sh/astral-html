@@ -23,7 +23,7 @@ for element in document.elements().filter(|element| element.is("a")) {
 - [Resource limits](docs/safety.md): allocation and input bounds.
 - [uv integration](docs/uv.md): compatibility tests and adapter.
 - [Fuzzing](docs/fuzzing.md): targets, oracles, and commands.
-- [Benchmarks](docs/performance.md): equivalent parsing and extraction against astral-tl.
+- [Benchmarks](docs/performance.md): parsing and field extraction workloads.
 
 The library is pre-release. Adoption in uv still requires its broader index and resolver integration tests.
 

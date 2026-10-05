@@ -22,8 +22,10 @@ For example, `<p>one<p>two` contains nested source scopes; a browser tree builde
 
 Names use ASCII case folding. Duplicate attributes keep the first normalized name. Attribute values are decoded exactly once; `raw_value` preserves their input spelling and distinguishes boolean attributes from explicit empty values. Text queries concatenate decoded descendant text without inserting layout whitespace; script and style text remains present.
 
-## Compatibility bar
+## API coverage
 
-All **32 pinned uv HTML inputs** must produce the same extracted fields as `astral-tl` 0.8.0. [uv.md](uv.md) describes the fields compared, the adapter, and the upstream integration tests needed before replacing uv's dependency.
+Generic document and reader tests use Insta inline snapshots of public API results. They cover lexical scopes, traversal, attributes, decoded text, text modes, and malformed-input recovery. Inputs and expected output appear together in each test.
 
-Malformed input follows the tokenization and lexical-scope rules above, which can differ from astral-tl.
+Direct assertions also check resource-limit boundaries, borrowing, source positions, permanent exhaustion, attribute deduplication, and deep traversal. The tokenizer corpus remains the token-output conformance check.
+
+The separate [uv integration workflow](uv.md) applies the adapter and runs all 31 upstream HTML tests unchanged. The 32 pinned inputs remain available as benchmark fixtures.
