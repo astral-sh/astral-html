@@ -533,7 +533,17 @@ impl<'a> Tokenizer<'a> {
         {
             self.position += 1;
         }
-        doctype.name = Some(normalize_name(&self.source[start..self.position]));
+        let name = &self.source[start..self.position];
+        doctype.name = Some(
+            if name
+                .bytes()
+                .any(|byte| byte.is_ascii_uppercase() || byte == 0)
+            {
+                normalize_name(name)
+            } else {
+                Cow::Borrowed(name)
+            },
+        );
         self.whitespace();
         match self.current() {
             Some(b'>') => return self.finish_doctype(doctype),
@@ -903,36 +913,29 @@ fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
-/// Fold ASCII case and replace NUL in tag and attribute names.
+/// Normalize a name already known to contain uppercase ASCII or NUL.
 #[inline(never)]
 fn normalize_name(input: &str) -> Cow<'_, str> {
     if let [byte @ b'A'..=b'Z'] = input.as_bytes() {
         let start = usize::from(byte - b'A');
         return Cow::Borrowed(&"abcdefghijklmnopqrstuvwxyz"[start..start + 1]);
     }
-    if input
-        .bytes()
-        .any(|byte| byte.is_ascii_uppercase() || byte == 0)
-    {
-        let names: &'static [&str] = match input.len() {
-            2 => &["br", "hr"],
-            3 => &["col", "img", "wbr", "xmp"],
-            4 if matches!(input.as_bytes()[0], b'h' | b'H') => &["head", "href", "html"],
-            4 => &["area", "base", "body", "link", "meta", "name"],
-            5 => &["embed", "input", "param", "style", "title", "track"],
-            6 => &["iframe", "script", "source"],
-            7 => &["content", "noembed"],
-            8 => &["noframes", "textarea"],
-            9 => &["plaintext"],
-            _ => &[],
-        };
-        if let Some(&name) = names.iter().find(|name| name.eq_ignore_ascii_case(input)) {
-            return Cow::Borrowed(name);
-        }
-        replace_null(Cow::Owned(input.to_ascii_lowercase()))
-    } else {
-        Cow::Borrowed(input)
+    let names: &'static [&str] = match input.len() {
+        2 => &["br", "hr"],
+        3 => &["col", "img", "wbr", "xmp"],
+        4 if matches!(input.as_bytes()[0], b'h' | b'H') => &["head", "href", "html"],
+        4 => &["area", "base", "body", "link", "meta", "name"],
+        5 => &["embed", "input", "param", "style", "title", "track"],
+        6 => &["iframe", "script", "source"],
+        7 => &["content", "noembed"],
+        8 => &["noframes", "textarea"],
+        9 => &["plaintext"],
+        _ => &[],
+    };
+    if let Some(&name) = names.iter().find(|name| name.eq_ignore_ascii_case(input)) {
+        return Cow::Borrowed(name);
     }
+    replace_null(Cow::Owned(input.to_ascii_lowercase()))
 }
 
 /// Normalize newlines and replace NUL together in text modes and declarations.

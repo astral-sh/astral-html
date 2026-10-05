@@ -249,6 +249,16 @@ fn scanning_cases() -> Vec<Case> {
             "<PaCkAgE DaTa-CuStOm='record'><A HrEf='/demo.whl'>demo</A></PaCkAgE>".repeat(128),
         ),
         (
+            "names-long-custom-generated",
+            format!(
+                "<custom-{}X data-{}Y='x'>text</custom-{}X>",
+                "name-".repeat(32),
+                "attribute-".repeat(16),
+                "name-".repeat(32)
+            )
+            .repeat(128),
+        ),
+        (
             "comment-plain-generated",
             format!(
                 "<!--{}-->",
