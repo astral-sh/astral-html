@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
+use std::num::NonZeroUsize;
 use std::ops::Range;
 
 use crate::{Attribute, Reader, Token};
@@ -71,7 +72,8 @@ pub struct Document<'a> {
 
 struct Node<'a> {
     kind: Kind<'a>,
-    parent: Option<usize>,
+    // One-based parent index reserves zero for root nodes.
+    parent: Option<NonZeroUsize>,
     // Exclusive subtree endpoint; text and void elements end at the next node.
     end: usize,
 }
@@ -127,7 +129,9 @@ impl<'a> Document<'a> {
                     if index >= limits.max_nodes {
                         return Err(Error::NodeLimit);
                     }
-                    let parent = open.last().map(|entry| entry.node);
+                    let parent = open
+                        .last()
+                        .and_then(|entry| NonZeroUsize::new(entry.node + 1));
                     if !is_void {
                         if open.len() == 8 && names.is_none() {
                             let mut index = HashMap::new();
@@ -184,7 +188,9 @@ impl<'a> Document<'a> {
                         }
                         document.nodes.push(Node {
                             kind: Kind::Text(text),
-                            parent: open.last().map(|entry| entry.node),
+                            parent: open
+                                .last()
+                                .and_then(|entry| NonZeroUsize::new(entry.node + 1)),
                             end: index + 1,
                         });
                     }
@@ -295,7 +301,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
     pub fn parent(self) -> Option<Self> {
         self.document.nodes[self.index].parent.map(|index| Self {
             document: self.document,
-            index,
+            index: index.get() - 1,
         })
     }
 
