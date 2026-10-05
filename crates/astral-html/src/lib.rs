@@ -1,4 +1,4 @@
-//! A read-only HTML parser for package indexes.
+//! An HTML parser.
 //!
 //! [`Reader`] yields tokens in source order and selects HTML text states.
 //! [`Tokenizer`] gives callers explicit control over those states. [`Document`]
