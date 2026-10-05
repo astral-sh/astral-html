@@ -29,8 +29,6 @@ drop the output (`astral_html::Reader`).
 ### Document construction
 
 Parse HTML into each library's native document and drop it (`astral_html::Document`).
-The representations differ: astral-html retains lexical scopes, while scraper
-performs HTML tree construction.
 
 | Parser | iniconfig | Bootstrap dashboard | Rust Book | PEP 8 | PEP index |
 | --- | ---: | ---: | ---: | ---: | ---: |
