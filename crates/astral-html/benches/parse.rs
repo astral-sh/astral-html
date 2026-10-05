@@ -308,6 +308,8 @@ fn entity_scanning_cases() -> Vec<Case> {
     [
         ("entities-rare-generated", r#"<a href="/demo.whl?x=&CounterClockwiseContourIntegral;&NotEqual;&Acy;&dHar;">demo</a>"#.repeat(512)),
         ("entities-unknown-generated", r#"<a href="/demo.whl?x=&DefinitelyNotAnEntityNameAtAll;&unknown=foo&notit=bar">demo</a>"#.repeat(512)),
+        ("entities-unknown-text-generated", format!("<p>{}</p><a href=/demo.whl>demo</a>", "&DefinitelyNotAnEntityNameAtAll; &CounterClockwiseContourIntegral &zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz; ".repeat(512))),
+        ("entities-legacy-text-generated", format!("<p>{}</p><a href=/demo.whl>demo</a>", "&notit; &AEligabcdefghijklmnopqrstuvwxyz; &copycat &notin ".repeat(512))),
         ("text-prefix-64k-generated", format!("{}&amp;<a href=/demo.whl>demo</a>", "x".repeat(65_536))),
     ].into_iter().map(|(name, input)| Case {name, input, root_index: false}).collect()
 }

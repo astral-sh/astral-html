@@ -32,6 +32,7 @@ impl<'a> Reader<'a> {
 
     /// Select text states while applying
     /// [`Tokenizer::next_with_attribute_buffer`]'s buffer contract.
+    #[inline(always)]
     pub(crate) fn next_with_attribute_buffer(
         &mut self,
         attribute_buffer: &mut Vec<Attribute<'a>>,

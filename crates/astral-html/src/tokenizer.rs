@@ -316,7 +316,7 @@ impl<'a> Tokenizer<'a> {
         while self.current().is_some_and(|byte| byte != b'>') {
             self.position += 1;
         }
-        let result = Token::Comment(replace_null(normalize(&self.source[start..self.position])));
+        let result = Token::Comment(normalize_text(&self.source[start..self.position]));
         if self.current().is_some() {
             self.position += 1;
         }
@@ -495,7 +495,7 @@ impl<'a> Tokenizer<'a> {
         {
             self.position += 1;
         }
-        let value = replace_null(normalize(&self.source[start..self.position]));
+        let value = normalize_text(&self.source[start..self.position]);
         let closed = self.current() == Some(quote);
         if closed {
             self.position += 1;
@@ -754,6 +754,7 @@ impl<'a> Tokenizer<'a> {
     /// Read the next token, reusing the supplied attribute buffer when possible.
     ///
     /// The attribute buffer must be empty; returned tags may take ownership of it.
+    #[inline(always)]
     pub(crate) fn next_with_attribute_buffer(
         &mut self,
         attribute_buffer: &mut Vec<Attribute<'a>>,
@@ -764,7 +765,7 @@ impl<'a> Tokenizer<'a> {
             match self.state {
                 State::Plaintext => {
                     self.position = self.source.len();
-                    return Some(Token::Text(replace_null(normalize(&self.source[start..]))));
+                    return Some(Token::Text(normalize_text(&self.source[start..])));
                 }
                 State::Cdata => {
                     let rest = &self.source[start..];
@@ -798,11 +799,11 @@ impl<'a> Tokenizer<'a> {
                     };
                     self.position = end;
                     let text = if self.state == State::Rcdata {
-                        decode(&self.source[start..end], false)
+                        replace_null(decode(&self.source[start..end], false))
                     } else {
-                        normalize(&self.source[start..end])
+                        normalize_text(&self.source[start..end])
                     };
-                    return Some(Token::Text(replace_null(text)));
+                    return Some(Token::Text(text));
                 }
                 State::Data => {}
             }
@@ -955,6 +956,36 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
     replace_null(Cow::Owned(input.to_ascii_lowercase()))
 }
 
+/// Normalize newlines and replace NUL together in text modes and declarations.
+#[inline]
+fn normalize_text(input: &str) -> Cow<'_, str> {
+    let Some(first) = memchr2(b'\r', 0, input.as_bytes()) else {
+        return Cow::Borrowed(input);
+    };
+    Cow::Owned(normalize_text_slow(input, first))
+}
+
+/// Copy transformed text once, reserving room for every NUL replacement.
+#[inline(never)]
+fn normalize_text_slow(input: &str, first: usize) -> String {
+    let nulls = memchr_iter(0, &input.as_bytes()[first..]).count();
+    let capacity = input.len().saturating_add(nulls.saturating_mul(2));
+    let mut output = String::with_capacity(capacity);
+    output.push_str(&input[..first]);
+    let mut rest = &input[first..];
+    while let Some(at) = memchr2(b'\r', 0, rest.as_bytes()) {
+        output.push_str(&rest[..at]);
+        let newline = rest.as_bytes()[at] == b'\r';
+        output.push(if newline { '\n' } else { '\u{fffd}' });
+        rest = &rest[at + 1..];
+        if newline && let Some(suffix) = rest.strip_prefix('\n') {
+            rest = suffix;
+        }
+    }
+    output.push_str(rest);
+    output
+}
+
 /// Replace NUL, reusing owned buffers.
 #[inline(never)]
 fn replace_null(input: Cow<'_, str>) -> Cow<'_, str> {
@@ -995,7 +1026,20 @@ fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
 mod tests {
     use std::borrow::Cow;
 
-    use super::replace_null;
+    use super::{normalize_text, replace_null};
+
+    #[test]
+    fn combined_text_normalization_preserves_unicode_and_newlines() {
+        assert!(matches!(normalize_text("plain 🦀 text"), Cow::Borrowed(_)));
+        for (source, expected) in [
+            ("\r\n\r\n", "\n\n"),
+            ("é\r\0\n🦀\0", "é\n�\n🦀�"),
+            ("\0\0\r", "��\n"),
+            ("prefix\r\nsuffix\0", "prefix\nsuffix�"),
+        ] {
+            assert_eq!(normalize_text(source), expected);
+        }
+    }
 
     #[test]
     fn owned_null_replacement_reuses_spare_capacity() {
