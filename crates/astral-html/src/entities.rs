@@ -263,10 +263,10 @@ mod tests {
             }
             if !name.ends_with(';') {
                 let terminated = format!("{name};");
-                let index = NAMED
-                    .binary_search_by_key(&terminated.as_str(), |(name, _)| *name)
-                    .expect("legacy references also have a terminated spelling");
-                assert_eq!(NAMED[index].1, expected, "{name}");
+                assert!(
+                    NAMED.contains(&(terminated.as_str(), expected)),
+                    "missing terminated spelling for {name}"
+                );
             }
         }
     }
