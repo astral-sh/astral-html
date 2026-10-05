@@ -3,7 +3,7 @@ name = "astral-html"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+license.workspace = true
 repository.workspace = true
 description = "A high-performance HTML parser designed for document traversal."
 
