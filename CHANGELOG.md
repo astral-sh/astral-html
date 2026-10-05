@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.3
+
+Released on 2026-10-05.
+
+### Performance
+
+- Speed parsing after tags with many attributes by discarding oversized
+  deduplication tables instead of repeatedly clearing them
+  ([astral-sh/astral-html#72](https://github.com/astral-sh/astral-html/pull/72))
+
+### Other changes
+
+- Make parser performance easier to compare with benchmark tables covering link
+  extraction and document construction across five workloads
+  ([astral-sh/astral-html#71](https://github.com/astral-sh/astral-html/pull/71))
+
 ## 0.0.2
 
 Released on 2026-10-05.
