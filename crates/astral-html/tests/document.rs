@@ -57,6 +57,10 @@ fn scopes_are_source_order_and_close_at_matching_end_tags() {
     let div = elements.next().unwrap();
     assert_eq!(div.text(), "onetwo");
     assert_eq!(
+        div.children().next().unwrap().parent().unwrap().name(),
+        "div"
+    );
+    assert_eq!(
         div.children().map(|child| child.name()).collect::<Vec<_>>(),
         ["p"]
     );
