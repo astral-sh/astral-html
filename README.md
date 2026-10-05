@@ -1,6 +1,6 @@
 # astral-html
 
-A high-performance HTML parser for document traversal.
+A high-performance HTML parser designed for document traversal.
 
 astral-html provides a borrowed event reader and immutable document views. It implements HTML tokenization and recovery without browser tree construction, mutation, or serialization.
 
