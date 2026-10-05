@@ -903,7 +903,7 @@ fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
-/// Compare a normalized name without ASCII case sensitivity.
+/// Compare `candidate` with `name`, whose ASCII letters must already be lowercase.
 #[inline(always)]
 pub(crate) fn matches_normalized_name(name: &[u8], candidate: &[u8]) -> bool {
     // The standard comparison processes long names in vector-sized chunks.
