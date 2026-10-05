@@ -24,14 +24,22 @@ accumulation.
 | Input                                 |   128 MiB |
 | Retained element and text nodes       | 4,000,000 |
 | Simultaneously open non-void elements |       256 |
+| Attributes encountered in one tag     |     1,024 |
+| Total attributes encountered          | 1,000,000 |
 
 `Document::parse_with_limits` accepts caller-supplied limits. Input size is
 checked before tokenization.
 
+Both attribute limits count duplicates and attributes on end tags or tags
+discarded at EOF. Each is checked before reading the next name or value. Set
+either limit to `usize::MAX` to make it nonbinding.
+
 Node and depth limits are checked before retaining the next node. The current
-token's strings and attributes may already have been allocated. Limits do not
-account for vector capacity, decoded strings, application output, or
-process-wide allocation failure; standard Rust allocation behavior applies.
+token's strings and permitted attributes may already have been allocated.
+Individual names and values can still allocate in proportion to
+`max_input_bytes`. Limits do not account for vector capacity, decoded strings,
+application output, or process-wide allocation failure; standard Rust allocation
+behavior applies.
 
 `Tokenizer` and `Reader` impose no input or token-size limits. Even without a
 document, a single token can contain a large attribute list or comment. Repeated

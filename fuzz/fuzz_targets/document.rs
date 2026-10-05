@@ -173,8 +173,30 @@ fuzz_target!(|bytes: &[u8]| {
         max_input_bytes: source.len(),
         max_nodes: source.len(),
         max_depth: source.len(),
+        max_attributes_per_tag: source.len(),
+        max_attributes: source.len(),
     };
     let document = Document::parse_with_limits(source, roomy).expect("nonbinding limits");
+    // Only attribute limits can fail here, including for duplicates and
+    // discarded tags that the model cannot count.
+    let tight_attributes = Limits {
+        max_attributes_per_tag: source.len() % 17,
+        max_attributes: source.len() % 33,
+        ..roomy
+    };
+    match Document::parse_with_limits(source, tight_attributes) {
+        Ok(bounded) => {
+            assert_eq!(bounded.elements().count(), document.elements().count());
+            for (actual, expected) in bounded.elements().zip(document.elements()) {
+                assert_eq!(actual.name(), expected.name());
+                assert!(actual.attributes().eq(expected.attributes()));
+            }
+        }
+        Err(error) => assert!(matches!(
+            error,
+            Error::TagAttributeLimit | Error::AttributeLimit
+        )),
+    }
     // Preserve larger-input parsing and query coverage while bounding the
     // independent model's linear name searches and repeated subtree walks.
     if bytes.len() > 4_096 {
@@ -219,6 +241,9 @@ fuzz_target!(|bytes: &[u8]| {
             Error::InputLimit => tight.max_input_bytes = used - 1,
             Error::NodeLimit => tight.max_nodes = used - 1,
             Error::DepthLimit => tight.max_depth = used - 1,
+            Error::TagAttributeLimit | Error::AttributeLimit => {
+                unreachable!("attribute limits are nonbinding in this model")
+            }
         }
         assert_eq!(
             Document::parse_with_limits(source, tight).err(),
