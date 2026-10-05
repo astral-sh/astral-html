@@ -6,6 +6,7 @@ The source SHA-256 is checked before parsing; no source code is executed.
 """
 
 import ast
+import bisect
 import hashlib
 import pathlib
 import string
@@ -38,7 +39,7 @@ def main():
     output.append("];")
     names = sorted(table)
     offsets = [
-        next((index for index, name in enumerate(names) if name[0] >= initial), len(names))
+        bisect.bisect_left(names, initial)
         for initial in string.ascii_uppercase + string.ascii_lowercase
     ] + [len(names)]
     output.extend(
