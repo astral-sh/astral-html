@@ -108,7 +108,7 @@ pub struct Tokenizer<'a> {
     source: &'a str,
     position: usize,
     state: State,
-    last_start_tag: Option<String>,
+    last_start_tag: Option<Cow<'static, str>>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -130,7 +130,7 @@ impl<'a> Tokenizer<'a> {
             state,
             last_start_tag: last_start_tag
                 .filter(|name| can_end_text(name))
-                .map(str::to_ascii_lowercase),
+                .map(|name| Cow::Owned(name.to_ascii_lowercase())),
         }
     }
 
@@ -139,7 +139,13 @@ impl<'a> Tokenizer<'a> {
         self.state = state;
         self.last_start_tag = last_start_tag
             .filter(|name| can_end_text(name))
-            .map(str::to_ascii_lowercase);
+            .map(|name| Cow::Owned(name.to_ascii_lowercase()));
+    }
+
+    /// Select a text mode using one of the reader's lowercase static tag names.
+    pub(crate) fn set_static_text_state(&mut self, state: State, name: &'static str) {
+        self.state = state;
+        self.last_start_tag = Some(Cow::Borrowed(name));
     }
 
     /// Return the byte offset of the next unread source character.

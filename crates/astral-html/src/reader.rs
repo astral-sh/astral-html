@@ -38,15 +38,20 @@ impl<'a> Reader<'a> {
     ) -> Option<Token<'a>> {
         let token = self.tokenizer.next_with_attribute_buffer(attribute_buffer);
         if let Some(Token::StartTag(tag)) = &token {
-            let state = match tag.name.as_ref() {
-                "title" | "textarea" => Some(State::Rcdata),
-                "style" | "xmp" | "iframe" | "noembed" | "noframes" => Some(State::Rawtext),
-                "script" => Some(State::ScriptData),
-                "plaintext" => Some(State::Plaintext),
+            let context = match tag.name.as_ref() {
+                "title" => Some((State::Rcdata, "title")),
+                "textarea" => Some((State::Rcdata, "textarea")),
+                "style" => Some((State::Rawtext, "style")),
+                "xmp" => Some((State::Rawtext, "xmp")),
+                "iframe" => Some((State::Rawtext, "iframe")),
+                "noembed" => Some((State::Rawtext, "noembed")),
+                "noframes" => Some((State::Rawtext, "noframes")),
+                "script" => Some((State::ScriptData, "script")),
+                "plaintext" => Some((State::Plaintext, "plaintext")),
                 _ => None,
             };
-            if let Some(state) = state {
-                self.tokenizer.set_state(state, Some(&tag.name));
+            if let Some((state, name)) = context {
+                self.tokenizer.set_static_text_state(state, name);
             }
         }
         token
