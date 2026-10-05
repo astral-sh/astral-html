@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::FusedIterator;
 
-use memchr::{memchr, memchr_iter, memchr2, memchr3};
+use memchr::{memchr, memchr_iter, memchr2, memchr3, memmem};
 
 use crate::entities::{decode, decode_from, normalize};
 
@@ -176,7 +176,7 @@ impl<'a> Tokenizer<'a> {
         rest.starts_with(b"</")
             && rest
                 .get(2..2 + name.len())
-                .is_some_and(|candidate| candidate.eq_ignore_ascii_case(name.as_bytes()))
+                .is_some_and(|candidate| matches_normalized_name(name.as_bytes(), candidate))
             && rest
                 .get(2 + name.len())
                 .is_some_and(|&byte| is_space(byte) || matches!(byte, b'/' | b'>'))
@@ -316,7 +316,7 @@ impl<'a> Tokenizer<'a> {
         while self.current().is_some_and(|byte| byte != b'>') {
             self.position += 1;
         }
-        let result = Token::Comment(replace_null(normalize(&self.source[start..self.position])));
+        let result = Token::Comment(normalize_text(&self.source[start..self.position]));
         if self.current().is_some() {
             self.position += 1;
         }
@@ -326,8 +326,18 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn comment(&mut self) -> Token<'a> {
         let rest = &self.source[self.position..];
-        if let Some(end) = memchr3(b'-', b'<', b'>', rest.as_bytes())
-            && rest[end..].starts_with("-->")
+        let end = memchr3(b'-', b'<', b'>', rest.as_bytes()).and_then(|at| {
+            if rest[at..].starts_with("-->") {
+                Some(at)
+            } else if at == 0 && (rest.starts_with('>') || rest.starts_with("->")) {
+                None
+            } else {
+                memmem::find(&rest.as_bytes()[at..], b"--")
+                    .map(|offset| at + offset)
+                    .filter(|&end| rest[end..].starts_with("-->"))
+            }
+        });
+        if let Some(end) = end
             && memchr2(b'\r', 0, &rest.as_bytes()[..end]).is_none()
         {
             self.position += end + 3;
@@ -495,7 +505,7 @@ impl<'a> Tokenizer<'a> {
         {
             self.position += 1;
         }
-        let value = replace_null(normalize(&self.source[start..self.position]));
+        let value = normalize_text(&self.source[start..self.position]);
         let closed = self.current() == Some(quote);
         if closed {
             self.position += 1;
@@ -533,7 +543,17 @@ impl<'a> Tokenizer<'a> {
         {
             self.position += 1;
         }
-        doctype.name = Some(normalize_name(&self.source[start..self.position]));
+        let name = &self.source[start..self.position];
+        doctype.name = Some(
+            if name
+                .bytes()
+                .any(|byte| byte.is_ascii_uppercase() || byte == 0)
+            {
+                normalize_name(name)
+            } else {
+                Cow::Borrowed(name)
+            },
+        );
         self.whitespace();
         match self.current() {
             Some(b'>') => return self.finish_doctype(doctype),
@@ -744,6 +764,7 @@ impl<'a> Tokenizer<'a> {
     /// Read the next token, reusing the supplied attribute buffer when possible.
     ///
     /// The attribute buffer must be empty; returned tags may take ownership of it.
+    #[inline(always)]
     pub(crate) fn next_with_attribute_buffer(
         &mut self,
         attribute_buffer: &mut Vec<Attribute<'a>>,
@@ -754,7 +775,7 @@ impl<'a> Tokenizer<'a> {
             match self.state {
                 State::Plaintext => {
                     self.position = self.source.len();
-                    return Some(Token::Text(replace_null(normalize(&self.source[start..]))));
+                    return Some(Token::Text(normalize_text(&self.source[start..])));
                 }
                 State::Cdata => {
                     let rest = &self.source[start..];
@@ -788,11 +809,11 @@ impl<'a> Tokenizer<'a> {
                     };
                     self.position = end;
                     let text = if self.state == State::Rcdata {
-                        decode(&self.source[start..end], false)
+                        replace_null(decode(&self.source[start..end], false))
                     } else {
-                        normalize(&self.source[start..end])
+                        normalize_text(&self.source[start..end])
                     };
-                    return Some(Token::Text(replace_null(text)));
+                    return Some(Token::Text(text));
                 }
                 State::Data => {}
             }
@@ -903,36 +924,76 @@ fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
-/// Fold ASCII case and replace NUL in tag and attribute names.
+/// Compare `candidate` with `name`, whose ASCII letters must already be lowercase.
+#[inline(always)]
+pub(crate) fn matches_normalized_name(name: &[u8], candidate: &[u8]) -> bool {
+    // The standard comparison processes long names in vector-sized chunks.
+    if name.len() >= 16 {
+        return name.eq_ignore_ascii_case(candidate);
+    }
+    name.len() == candidate.len()
+        && name
+            .iter()
+            .zip(candidate)
+            .all(|(&name, &candidate)| name == candidate.to_ascii_lowercase())
+}
+
+/// Normalize a name already known to contain uppercase ASCII or NUL.
 #[inline(never)]
 fn normalize_name(input: &str) -> Cow<'_, str> {
     if let [byte @ b'A'..=b'Z'] = input.as_bytes() {
         let start = usize::from(byte - b'A');
         return Cow::Borrowed(&"abcdefghijklmnopqrstuvwxyz"[start..start + 1]);
     }
-    if input
-        .bytes()
-        .any(|byte| byte.is_ascii_uppercase() || byte == 0)
+    let names: &'static [&str] = match input.len() {
+        2 => &["br", "hr"],
+        3 => &["col", "img", "wbr", "xmp"],
+        4 if matches!(input.as_bytes()[0], b'h' | b'H') => &["head", "href", "html"],
+        4 => &["area", "base", "body", "link", "meta", "name"],
+        5 => &["embed", "input", "param", "style", "title", "track"],
+        6 => &["iframe", "script", "source"],
+        7 => &["content", "noembed"],
+        8 => &["noframes", "textarea"],
+        9 => &["plaintext"],
+        _ => &[],
+    };
+    if let Some(&name) = names
+        .iter()
+        .find(|name| matches_normalized_name(name.as_bytes(), input.as_bytes()))
     {
-        let names: &'static [&str] = match input.len() {
-            2 => &["br", "hr"],
-            3 => &["col", "img", "wbr", "xmp"],
-            4 if matches!(input.as_bytes()[0], b'h' | b'H') => &["head", "href", "html"],
-            4 => &["area", "base", "body", "link", "meta", "name"],
-            5 => &["embed", "input", "param", "style", "title", "track"],
-            6 => &["iframe", "script", "source"],
-            7 => &["content", "noembed"],
-            8 => &["noframes", "textarea"],
-            9 => &["plaintext"],
-            _ => &[],
-        };
-        if let Some(&name) = names.iter().find(|name| name.eq_ignore_ascii_case(input)) {
-            return Cow::Borrowed(name);
-        }
-        replace_null(Cow::Owned(input.to_ascii_lowercase()))
-    } else {
-        Cow::Borrowed(input)
+        return Cow::Borrowed(name);
     }
+    replace_null(Cow::Owned(input.to_ascii_lowercase()))
+}
+
+/// Normalize newlines and replace NUL together in text modes and declarations.
+#[inline]
+fn normalize_text(input: &str) -> Cow<'_, str> {
+    let Some(first) = memchr2(b'\r', 0, input.as_bytes()) else {
+        return Cow::Borrowed(input);
+    };
+    Cow::Owned(normalize_text_slow(input, first))
+}
+
+/// Copy transformed text once, reserving room for every NUL replacement.
+#[inline(never)]
+fn normalize_text_slow(input: &str, first: usize) -> String {
+    let nulls = memchr_iter(0, &input.as_bytes()[first..]).count();
+    let capacity = input.len().saturating_add(nulls.saturating_mul(2));
+    let mut output = String::with_capacity(capacity);
+    output.push_str(&input[..first]);
+    let mut rest = &input[first..];
+    while let Some(at) = memchr2(b'\r', 0, rest.as_bytes()) {
+        output.push_str(&rest[..at]);
+        let newline = rest.as_bytes()[at] == b'\r';
+        output.push(if newline { '\n' } else { '\u{fffd}' });
+        rest = &rest[at + 1..];
+        if newline && let Some(suffix) = rest.strip_prefix('\n') {
+            rest = suffix;
+        }
+    }
+    output.push_str(rest);
+    output
 }
 
 /// Replace NUL, reusing owned buffers.
@@ -975,7 +1036,36 @@ fn replace_null_slow(input: Cow<'_, str>) -> Cow<'_, str> {
 mod tests {
     use std::borrow::Cow;
 
-    use super::replace_null;
+    use super::{normalize_text, replace_null};
+
+    #[test]
+    fn combined_text_normalization_preserves_unicode_and_newlines() {
+        assert!(matches!(normalize_text("plain 🦀 text"), Cow::Borrowed(_)));
+        for (source, expected) in [
+            ("\r\n\r\n", "\n\n"),
+            ("é\r\0\n🦀\0", "é\n�\n🦀�"),
+            ("\0\0\r", "��\n"),
+            ("prefix\r\nsuffix\0", "prefix\nsuffix�"),
+        ] {
+            assert_eq!(normalize_text(source), expected);
+        }
+    }
+
+    #[test]
+    fn ordinary_comments_borrow_punctuation() {
+        for text in [
+            "generated-by tool <meta> and > punctuation",
+            "-leading and mid-word",
+            "<!",
+            "é 🦀 - < >",
+        ] {
+            let source = format!("<!--{text}-->");
+            assert!(matches!(
+                super::Tokenizer::new(&source).next(),
+                Some(super::Token::Comment(Cow::Borrowed(value))) if value == text
+            ));
+        }
+    }
 
     #[test]
     fn owned_null_replacement_reuses_spare_capacity() {

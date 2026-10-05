@@ -206,7 +206,7 @@ fn document_and_views_are_send_and_sync() {
 #[test]
 fn repeated_names_restore_scopes_after_name_index_promotion() {
     let input = format!(
-        "{}inner</a>after</a>tail{}<a>sibling</a>",
+        "{}</missing>inner</a>after</a>tail{}<a>sibling</a>",
         "<a>".repeat(9),
         "</a>".repeat(7)
     );
@@ -222,4 +222,47 @@ fn repeated_names_restore_scopes_after_name_index_promotion() {
     assert!(elements[0].parent().is_none());
     assert!(elements[9].parent().is_none());
     assert_eq!(elements[0].children().count(), 1);
+}
+
+#[test]
+fn deep_mismatched_end_tags_close_the_innermost_matching_scope() {
+    let input = format!(
+        "<main>{}<span>inner</a>after</span>tail</main><p>sibling</p>",
+        "<a>".repeat(9),
+    );
+    let document = Document::parse(&input).unwrap();
+    let elements: Vec<_> = document.elements().collect();
+    assert_eq!(elements[0].text(), "inneraftertail");
+    assert_eq!(elements[9].text(), "inner");
+    assert_eq!(elements[10].text(), "inner");
+    assert_eq!(elements[11].text(), "sibling");
+    assert!(elements[11].parent().is_none());
+    assert_eq!(elements[0].children().count(), 1);
+}
+
+#[test]
+fn name_queries_fold_ascii_letters_only() {
+    let document = Document::parse("<a-é data-é=x data-[=y></a-é>").unwrap();
+    let element = document.elements().next().unwrap();
+    assert!(element.is("A-é"));
+    assert!(!element.is("A-É"));
+    assert_eq!(element.attribute("DATA-é").unwrap().value(), "x");
+    assert!(element.attribute("DATA-É").is_none());
+    assert!(element.attribute("data-{").is_none());
+}
+
+#[test]
+fn name_queries_match_across_comparison_lengths() {
+    for len in [15, 16, 17, 128] {
+        let name = "a".repeat(len);
+        let input = format!("<{name} {name}=value></{name}>");
+        let document = Document::parse(&input).unwrap();
+        let element = document.elements().next().unwrap();
+        let query = name.to_ascii_uppercase();
+        assert!(element.is(&query));
+        assert_eq!(element.attribute(&query).unwrap().value(), "value");
+        let query = format!("{}B", "A".repeat(len - 1));
+        assert!(!element.is(&query));
+        assert!(element.attribute(&query).is_none());
+    }
 }

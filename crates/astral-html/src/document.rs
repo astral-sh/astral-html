@@ -6,6 +6,7 @@ use std::fmt;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
+use crate::tokenizer::matches_normalized_name;
 use crate::{Attribute, Reader, Token};
 
 /// Resource limits for constructing a document.
@@ -113,8 +114,8 @@ impl<'a> Document<'a> {
             attributes: Vec::new(),
         };
         let mut open: Vec<Open> = Vec::new();
-        // Small stacks need no name index. Promote deeper documents once, so
-        // unmatched end tags cannot repeatedly scan an unbounded open stack.
+        // Matching the top scope needs no index. Promote a deep stack on its
+        // first mismatch, so repeated unmatched end tags remain bounded.
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
         let mut reader = Reader::new(source);
         let mut attribute_buffer = Vec::new();
@@ -133,16 +134,6 @@ impl<'a> Document<'a> {
                         .last()
                         .and_then(|entry| NonZeroUsize::new(entry.node + 1));
                     if !is_void {
-                        if open.len() == 8 && names.is_none() {
-                            let mut index = HashMap::new();
-                            for (depth, entry) in open.iter_mut().enumerate() {
-                                let Kind::Element(tag) = &document.nodes[entry.node].kind else {
-                                    unreachable!()
-                                };
-                                entry.previous = index.insert(tag.name.clone(), depth);
-                            }
-                            names = Some(index);
-                        }
                         let previous = names
                             .as_mut()
                             .and_then(|names| names.insert(tag.name.clone(), open.len()));
@@ -168,7 +159,22 @@ impl<'a> Document<'a> {
                     tag.attributes
                 }
                 Token::EndTag(tag) => {
-                    let depth = if let Some(names) = &names {
+                    let matches_top = open.last().is_some_and(|entry| {
+                        matches!(&document.nodes[entry.node].kind, Kind::Element(start) if start.name == tag.name)
+                    });
+                    if !matches_top && open.len() > 8 && names.is_none() {
+                        let mut index = HashMap::new();
+                        for (depth, entry) in open.iter_mut().enumerate() {
+                            let Kind::Element(tag) = &document.nodes[entry.node].kind else {
+                                unreachable!()
+                            };
+                            entry.previous = index.insert(tag.name.clone(), depth);
+                        }
+                        names = Some(index);
+                    }
+                    let depth = if matches_top {
+                        Some(open.len() - 1)
+                    } else if let Some(names) = &names {
                         names.get(tag.name.as_ref()).copied()
                     } else {
                         open.iter().rposition(|entry| {
@@ -274,7 +280,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
     /// Compare an HTML element name without ASCII case sensitivity.
     pub fn is(self, name: &str) -> bool {
         let actual = self.name();
-        actual == name || actual.eq_ignore_ascii_case(name)
+        actual == name || matches_normalized_name(actual.as_bytes(), name.as_bytes())
     }
 
     /// Find an attribute without ASCII case sensitivity. The first occurrence wins.
@@ -283,8 +289,10 @@ impl<'doc, 'src> Element<'doc, 'src> {
     /// source spelling.
     #[inline]
     pub fn attribute(self, name: &str) -> Option<&'doc Attribute<'src>> {
-        self.attributes()
-            .find(|attribute| attribute.name == name || attribute.name.eq_ignore_ascii_case(name))
+        self.attributes().find(|attribute| {
+            attribute.name == name
+                || matches_normalized_name(attribute.name.as_bytes(), name.as_bytes())
+        })
     }
 
     /// Test for an attribute, including a boolean attribute with no value.
