@@ -83,9 +83,9 @@ Results stay separate by operation, document, and session. The report does not p
 The repository README shows extraction from the PEP index, the largest fixture. Its [source measurements](results/README.md) include all five documents, all sessions, and the raw Criterion samples. Regenerate the light and dark SVGs with:
 
 ```console
-uv run benchmarks/scripts/plot.py benchmarks/results/epyc-vm-952e116.json
+python3 benchmarks/scripts/plot.py benchmarks/results/epyc-vm-952e116.json
 ```
 
-The plot uses the median of session means, with whiskers spanning those means. Its Matplotlib dependency is isolated from the benchmark runner and declared in the script.
+The plot uses the median of session means and shows Reader for astral-html; Document remains in the detailed results. The generator uses Python's standard library to update [Ruff's original README SVG](scripts/templates/README.md), preserving its layout and light/dark styling.
 
 CI runs a smoke test to validate adapters, corpus integrity, report generation, and benchmark execution. Its timings are not release performance results.

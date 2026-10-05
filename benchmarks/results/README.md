@@ -9,10 +9,11 @@ started from a clean checkout and recorded no source changes.
 
 The README chart selects the PEP index because it is the largest of the five
 checked-in fixtures: 418,744 bytes and 2,099 extracted links. All six adapters
-produced the same link records. Each bar is the median of three independent
-session means; whiskers show the minimum and maximum of those session means,
-not a confidence interval. The complete corpus is summarized below to make the
-selection explicit.
+produced the same link records. The chart shows Reader for astral-html alongside
+the four other crates; Document remains in the detailed results. Each bar is the
+median of three independent session means. Individual session estimates and
+confidence intervals are preserved in the source data. The complete corpus is
+summarized below to make the selection explicit.
 
 ## Link extraction
 
