@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::entities_data::{INITIAL_OFFSETS, NAMED};
+use crate::entities_data::{LABELS, NODES, NamedNode, VALUE_DATA, VALUES};
 
 /// Decode HTML character references and normalize input CRLF and CR to LF.
 ///
@@ -148,38 +148,50 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
         b'a'..=b'z' => usize::from(bytes[0] - b'a') + 26,
         _ => return None,
     };
-    let named =
-        &NAMED[usize::from(INITIAL_OFFSETS[initial])..usize::from(INITIAL_OFFSETS[initial + 1])];
-
-    // Bound unknown names by the longest WHATWG reference (32 bytes including `;`).
-    let mut end = 0;
-    while end < 32 && bytes.get(end).is_some_and(u8::is_ascii_alphanumeric) {
-        end += 1;
-    }
-    if end < 32 && bytes.get(end) == Some(&b';') {
-        end += 1;
-    }
-    for length in (1..=end).rev() {
-        let candidate = &input[..length];
-        if let Ok(index) = named.binary_search_by_key(&candidate, |(name, _)| *name) {
-            if !candidate.ends_with(';')
-                && attribute
-                && bytes
-                    .get(length)
-                    .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'=')
-            {
-                return None;
+    let mut node = &NODES[initial];
+    let mut consumed = 0;
+    let mut matched = None;
+    loop {
+        let &NamedNode(label, children, value, label_len, child_count) = node;
+        let label = usize::from(label);
+        if !bytes[consumed..].starts_with(&LABELS[label..label + usize::from(label_len)]) {
+            break;
+        }
+        consumed += usize::from(label_len);
+        if value != 0 {
+            if bytes.get(consumed) == Some(&b';') {
+                matched = Some((consumed + 1, value));
+                break;
             }
-            return Some((length, Replacement::Named(named[index].1)));
+            // The high bit marks a legacy spelling that can omit its semicolon.
+            if value & 0x8000 != 0
+                && (!attribute
+                    || !bytes
+                        .get(consumed)
+                        .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'='))
+            {
+                matched = Some((consumed, value));
+            }
         }
-        // Every legacy name also has a semicolon-terminated spelling. After
-        // this exact lookup fails, any shorter match would therefore be
-        // followed by an ASCII letter or digit, which attributes disallow.
-        if attribute {
-            return None;
-        }
+        let Some(&next) = bytes.get(consumed) else {
+            break;
+        };
+        let children = usize::from(children);
+        let children = &NODES[children..children + usize::from(child_count)];
+        let Ok(index) = children.binary_search_by_key(&next, |node| LABELS[usize::from(node.0)])
+        else {
+            break;
+        };
+        node = &children[index];
     }
-    None
+    matched.map(|(length, value)| {
+        let (start, len) = VALUES[usize::from((value & 0x7fff) - 1)];
+        let start = usize::from(start);
+        (
+            length,
+            Replacement::Named(&VALUE_DATA[start..start + usize::from(len)]),
+        )
+    })
 }
 
 /// Apply the numeric reference replacement rules, including Windows-1252.
@@ -200,6 +212,7 @@ fn numeric(number: u32) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities_data::NAMED;
 
     #[test]
     fn named_references_follow_attribute_context() {
@@ -212,6 +225,27 @@ mod tests {
             "&notit; &amp=1 & ≂\u{338}"
         );
         assert_eq!(decode("&amp;lt;", true), "&lt;");
+    }
+
+    #[test]
+    fn unterminated_named_references_choose_the_longest_legacy_prefix() {
+        for &(name, _) in NAMED {
+            let name = name.trim_end_matches(';');
+            let source = format!("&{name}");
+            let legacy = NAMED
+                .iter()
+                .filter(|(legacy, _)| !legacy.ends_with(';') && name.starts_with(legacy))
+                .max_by_key(|(legacy, _)| legacy.len());
+            let expected = legacy.map_or_else(
+                || source.clone(),
+                |(legacy, value)| format!("{value}{}", &name[legacy.len()..]),
+            );
+            assert_eq!(decode(&source, false), expected, "{source}");
+            let expected = legacy
+                .filter(|(legacy, _)| legacy.len() == name.len())
+                .map_or(source.as_str(), |(_, value)| *value);
+            assert_eq!(decode(&source, true), expected, "{source}");
+        }
     }
 
     #[test]
