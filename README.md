@@ -4,6 +4,19 @@ An HTML parser written in Rust.
 
 astral-html provides a borrowed event reader and immutable document views. It implements HTML tokenization and recovery without browser tree construction, mutation, or serialization.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/extraction-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/extraction-light.svg">
+    <img alt="Link extraction from the PEP index: astral-html Reader 1.28 ms, astral-tl 1.55 ms, astral-html Document 2.49 ms, lol_html 2.76 ms, html5gum 2.83 ms, and scraper 10.49 ms. Lower is better." src="docs/assets/extraction-light.svg" width="720">
+  </picture>
+</p>
+
+<p align="center">
+  <i>Extracting 2,099 links from the PEP index with warm input on a shared AMD EPYC VM.
+  <a href="benchmarks/results/README.md">Measurements and methodology</a>.</i>
+</p>
+
 ```rust
 use astral_html::Document;
 

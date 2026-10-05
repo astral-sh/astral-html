@@ -80,4 +80,12 @@ Run on a quiet machine with fixed settings and disclose virtualization, power po
 
 Results stay separate by operation, document, and session. The report does not pool samples or calculate an overall winner. Review variation across sessions and avoid comparing timings across different eligible corpora. Report dirty-source runs and any source changes during measurement; the report flags those as unsuitable for publication.
 
+The repository README shows extraction from the PEP index, the largest fixture. Its [source measurements](results/README.md) include all five documents, all sessions, and the raw Criterion samples. Regenerate the light and dark SVGs with:
+
+```console
+uv run benchmarks/scripts/plot.py benchmarks/results/epyc-vm-952e116.json
+```
+
+The plot uses the median of session means, with whiskers spanning those means. Its Matplotlib dependency is isolated from the benchmark runner and declared in the script.
+
 CI runs a smoke test to validate adapters, corpus integrity, report generation, and benchmark execution. Its timings are not release performance results.
