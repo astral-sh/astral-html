@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "repositories": {
+    "astral-html": {
+      "name": "astral-sh/astral-html",
+      "id": 1404430784,
+      "oidc_subject": "immutable",
+      "owner_id": 115962839
+    }
+  },
+  "rules": [
+    {
+      "caller": "astral-html",
+      "environment": "automations",
+      "caller_ref": "refs/heads/main",
+      "caller_workflow": "release-prepare.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "contents": "write", "pull_requests": "write" },
+      "target": "astral-html"
+    }
+  ]
+}
