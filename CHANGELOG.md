@@ -21,8 +21,8 @@ designed for document traversal.
 - Decode named and numeric HTML character references according to their text or
   attribute context
   ([astral-sh/astral-html#3](https://github.com/astral-sh/astral-html/pull/3))
-- Allow documents with any number of attributes while retaining input, node,
-  and nesting limits
+- Allow documents with any number of attributes while retaining input, node, and
+  nesting limits
   ([astral-sh/astral-html#34](https://github.com/astral-sh/astral-html/pull/34))
 - Add the initial `astral-html` crate without unsafe code or a mandated
   allocator
@@ -40,8 +40,8 @@ designed for document traversal.
   unchanged comments, decoded strings, and common normalized names
   ([astral-sh/astral-html#16](https://github.com/astral-sh/astral-html/pull/16))
   ([astral-sh/astral-html#21](https://github.com/astral-sh/astral-html/pull/21))
-- Make unknown and unterminated named references substantially faster with
-  early attribute-context rejection and a compact trie
+- Make unknown and unterminated named references substantially faster with early
+  attribute-context rejection and a compact trie
   ([astral-sh/astral-html#45](https://github.com/astral-sh/astral-html/pull/45))
   ([astral-sh/astral-html#52](https://github.com/astral-sh/astral-html/pull/52))
 - Borrow unchanged punctuation-heavy comments instead of allocating strings for
@@ -59,16 +59,16 @@ designed for document traversal.
 - Normalize comment newlines while scanning to avoid a second full-buffer
   allocation
   ([astral-sh/astral-html#28](https://github.com/astral-sh/astral-html/pull/28))
-- Release excessive capacity after character-reference decoding so small
-  results do not retain input-sized allocations
+- Release excessive capacity after character-reference decoding so small results
+  do not retain input-sized allocations
   ([astral-sh/astral-html#27](https://github.com/astral-sh/astral-html/pull/27))
 - Avoid indexing balanced open elements until malformed nesting requires
   recovery
   ([astral-sh/astral-html#53](https://github.com/astral-sh/astral-html/pull/53))
 - Scan comment and script content in bulk
   ([astral-sh/astral-html#36](https://github.com/astral-sh/astral-html/pull/36))
-- Delay attribute-name indexing until it is beneficial and reuse its
-  allocation between tags
+- Delay attribute-name indexing until it is beneficial and reuse its allocation
+  between tags
   ([astral-sh/astral-html#38](https://github.com/astral-sh/astral-html/pull/38))
   ([astral-sh/astral-html#46](https://github.com/astral-sh/astral-html/pull/46))
 - Speed named-reference decoding with direct handling for common names and
@@ -91,24 +91,3 @@ designed for document traversal.
 - Avoid allocating names when entering built-in script, raw-text, and RCDATA
   modes
   ([astral-sh/astral-html#43](https://github.com/astral-sh/astral-html/pull/43))
-
-### Documentation
-
-- Document parser semantics, conformance boundaries, resource limits,
-  borrowing, and packaged licenses
-  ([astral-sh/astral-html#14](https://github.com/astral-sh/astral-html/pull/14))
-  ([astral-sh/astral-html#18](https://github.com/astral-sh/astral-html/pull/18))
-- Add introductory examples for the `Document` and `Reader` APIs
-  ([astral-sh/astral-html#63](https://github.com/astral-sh/astral-html/pull/63))
-- Clarify that astral-html is a general-purpose HTML parser designed for
-  document traversal
-  ([astral-sh/astral-html#47](https://github.com/astral-sh/astral-html/pull/47))
-  ([astral-sh/astral-html#60](https://github.com/astral-sh/astral-html/pull/60))
-- Add a benchmark chart comparing link extraction with other Rust HTML parsers
-  ([astral-sh/astral-html#51](https://github.com/astral-sh/astral-html/pull/51))
-
-### Other changes
-
-- Generate named character-reference data directly from a pinned WHATWG source
-  while preserving the generated lookup contents
-  ([astral-sh/astral-html#65](https://github.com/astral-sh/astral-html/pull/65))
