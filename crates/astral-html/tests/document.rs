@@ -206,7 +206,7 @@ fn document_and_views_are_send_and_sync() {
 #[test]
 fn repeated_names_restore_scopes_after_name_index_promotion() {
     let input = format!(
-        "{}inner</a>after</a>tail{}<a>sibling</a>",
+        "{}</missing>inner</a>after</a>tail{}<a>sibling</a>",
         "<a>".repeat(9),
         "</a>".repeat(7)
     );
@@ -221,5 +221,22 @@ fn repeated_names_restore_scopes_after_name_index_promotion() {
     assert_eq!(elements[9].text(), "sibling");
     assert!(elements[0].parent().is_none());
     assert!(elements[9].parent().is_none());
+    assert_eq!(elements[0].children().count(), 1);
+}
+
+#[test]
+fn deep_mismatched_end_tags_close_the_innermost_matching_scope() {
+    let input = format!(
+        "<main>{}<span>{}inner</a>after</span>tail</main><p>sibling</p>",
+        "<a>".repeat(16),
+        "</missing>".repeat(1_000),
+    );
+    let document = Document::parse(&input).unwrap();
+    let elements: Vec<_> = document.elements().collect();
+    assert_eq!(elements[0].text(), "inneraftertail");
+    assert_eq!(elements[16].text(), "inner");
+    assert_eq!(elements[17].text(), "inner");
+    assert_eq!(elements[18].text(), "sibling");
+    assert!(elements[18].parent().is_none());
     assert_eq!(elements[0].children().count(), 1);
 }

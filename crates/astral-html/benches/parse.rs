@@ -1,7 +1,7 @@
 //! Measure parse-and-extract workloads.
 //!
 //! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
-//! names, comments, and scripts; `entity-scanning` covers references and long
+//! names, nesting, comments, and scripts; `entity-scanning` covers references and long
 //! text prefixes. The default suite includes captured and generated
 //! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
 //! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=1`.
@@ -231,6 +231,19 @@ fn scanning_cases() -> Vec<Case> {
         "records.push({name: 'example', enabled: true});\n".repeat(512)
     );
     [
+        (
+            "deep-balanced-generated",
+            format!("{}text{}", "<section>".repeat(128), "</section>".repeat(128)),
+        ),
+        (
+            "deep-unmatched-generated",
+            format!(
+                "{}{}text{}",
+                "<section>".repeat(128),
+                "</missing>".repeat(1_024),
+                "</section>".repeat(128)
+            ),
+        ),
         (
             "names-generated",
             "<PaCkAgE DaTa-CuStOm='record'><A HrEf='/demo.whl'>demo</A></PaCkAgE>".repeat(128),
