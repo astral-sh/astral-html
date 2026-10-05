@@ -1,11 +1,14 @@
 # Third-party data
 
-`crates/astral-html/src/entities_data.rs` is generated from the WHATWG named
-character references in
-[CPython v3.14.0](https://github.com/python/cpython/blob/v3.14.0/Lib/html/entities.py).
-The source checksum is pinned in `scripts/generate_entities.py`; its license is
-preserved in [CPython.txt](CPython.txt). The generator parses the Python literal
-without executing the source.
+`crates/astral-html/src/entities_data.rs` is generated directly from WHATWG's
+[named character references](https://html.spec.whatwg.org/entities.json). The
+source checksum is pinned in `scripts/generate_entities.py`.
 
-The parser code is licensed under MIT OR Apache-2.0. Test fixtures carry their
-own provenance and license notices alongside the data.
+To regenerate the checked-in table:
+
+```console
+curl -o /tmp/entities.json https://html.spec.whatwg.org/entities.json
+python3 scripts/generate_entities.py /tmp/entities.json
+```
+
+Test fixtures carry their own provenance and license notices alongside the data.
