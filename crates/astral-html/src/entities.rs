@@ -29,7 +29,7 @@ pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
 
 /// Start at an ASCII marker from the initial scan; preceding bytes need no transformation.
 #[inline(never)]
-fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> {
+pub(crate) fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let mut output = None;
     let mut unchanged = 0;

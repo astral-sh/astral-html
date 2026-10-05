@@ -6,7 +6,7 @@ use std::iter::FusedIterator;
 
 use memchr::{memchr, memchr_iter, memchr2, memchr3};
 
-use crate::entities::{decode, normalize};
+use crate::entities::{decode, decode_from, normalize};
 
 /// A tokenizer state selected by the caller or a tree builder.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
@@ -804,9 +804,10 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.position = memchr(b'<', &rest[first..])
                     .map_or(self.source.len(), |offset| start + first + offset);
-                return Some(Token::Text(decode(
+                return Some(Token::Text(decode_from(
                     &self.source[start..self.position],
                     false,
+                    first,
                 )));
             }
             let rest = &self.source.as_bytes()[start..];
