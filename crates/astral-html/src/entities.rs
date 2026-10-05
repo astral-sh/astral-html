@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::entities_data::NAMED;
+use crate::entities_data::{INITIAL_OFFSETS, NAMED};
 
 /// Decode HTML character references and normalize input CRLF and CR to LF.
 ///
@@ -143,6 +143,14 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
         return Some((length, Replacement::Named(value)));
     }
 
+    let initial = match bytes.first()? {
+        b'A'..=b'Z' => usize::from(bytes[0] - b'A'),
+        b'a'..=b'z' => usize::from(bytes[0] - b'a') + 26,
+        _ => return None,
+    };
+    let named =
+        &NAMED[usize::from(INITIAL_OFFSETS[initial])..usize::from(INITIAL_OFFSETS[initial + 1])];
+
     // Bound unknown names by the longest WHATWG reference (32 bytes including `;`).
     let mut end = 0;
     while end < 32 && bytes.get(end).is_some_and(u8::is_ascii_alphanumeric) {
@@ -153,7 +161,7 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
     }
     for length in (1..=end).rev() {
         let candidate = &input[..length];
-        if let Ok(index) = NAMED.binary_search_by_key(&candidate, |(name, _)| *name) {
+        if let Ok(index) = named.binary_search_by_key(&candidate, |(name, _)| *name) {
             if !candidate.ends_with(';')
                 && attribute
                 && bytes
@@ -162,7 +170,7 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
             {
                 return None;
             }
-            return Some((length, Replacement::Named(NAMED[index].1)));
+            return Some((length, Replacement::Named(named[index].1)));
         }
         // Every legacy name also has a semicolon-terminated spelling. After
         // this exact lookup fails, any shorter match would therefore be
