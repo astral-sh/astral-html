@@ -1,6 +1,6 @@
 # astral-html
 
-A read-only HTML parser for package indexes, written in Rust.
+An HTML parser written in Rust.
 
 `Reader` emits HTML events, `Tokenizer` accepts explicit fragment context, and `Document` provides immutable element, attribute, and text views. Unchanged strings borrow from the UTF-8 input. Document construction accepts configurable input, node, and nesting limits.
 

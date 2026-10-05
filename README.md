@@ -1,13 +1,13 @@
 # astral-html
 
-A read-only HTML parser for package indexes, written in Rust.
+An HTML parser written in Rust.
 
-astral-html provides a borrowed event reader and immutable document views for uv's package indexes. It implements HTML tokenization and recovery without browser tree construction, mutation, or serialization.
+astral-html provides a borrowed event reader and immutable document views. It implements HTML tokenization and recovery without browser tree construction, mutation, or serialization.
 
 ```rust
 use astral_html::Document;
 
-let source = r#"<a href="demo-1.0.tar.gz" data-requires-python="&gt;=3.12">demo</a>"#;
+let source = r#"<a href="/guide">Read the guide</a>"#;
 let document = Document::parse(source)?;
 
 for element in document.elements().filter(|element| element.is("a")) {
