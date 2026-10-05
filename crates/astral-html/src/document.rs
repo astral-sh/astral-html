@@ -113,8 +113,8 @@ impl<'a> Document<'a> {
             attributes: Vec::new(),
         };
         let mut open: Vec<Open> = Vec::new();
-        // Small stacks need no name index. Promote deeper documents once, so
-        // unmatched end tags cannot repeatedly scan an unbounded open stack.
+        // Matching the top scope needs no index. Promote a deep stack on its
+        // first mismatch, so repeated unmatched end tags remain bounded.
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
         let mut reader = Reader::new(source);
         let mut attribute_buffer = Vec::new();
@@ -133,16 +133,6 @@ impl<'a> Document<'a> {
                         .last()
                         .and_then(|entry| NonZeroUsize::new(entry.node + 1));
                     if !is_void {
-                        if open.len() == 8 && names.is_none() {
-                            let mut index = HashMap::new();
-                            for (depth, entry) in open.iter_mut().enumerate() {
-                                let Kind::Element(tag) = &document.nodes[entry.node].kind else {
-                                    unreachable!()
-                                };
-                                entry.previous = index.insert(tag.name.clone(), depth);
-                            }
-                            names = Some(index);
-                        }
                         let previous = names
                             .as_mut()
                             .and_then(|names| names.insert(tag.name.clone(), open.len()));
@@ -168,7 +158,22 @@ impl<'a> Document<'a> {
                     tag.attributes
                 }
                 Token::EndTag(tag) => {
-                    let depth = if let Some(names) = &names {
+                    let matches_top = open.last().is_some_and(|entry| {
+                        matches!(&document.nodes[entry.node].kind, Kind::Element(start) if start.name == tag.name)
+                    });
+                    if !matches_top && open.len() > 8 && names.is_none() {
+                        let mut index = HashMap::new();
+                        for (depth, entry) in open.iter_mut().enumerate() {
+                            let Kind::Element(tag) = &document.nodes[entry.node].kind else {
+                                unreachable!()
+                            };
+                            entry.previous = index.insert(tag.name.clone(), depth);
+                        }
+                        names = Some(index);
+                    }
+                    let depth = if matches_top {
+                        Some(open.len() - 1)
+                    } else if let Some(names) = &names {
                         names.get(tag.name.as_ref()).copied()
                     } else {
                         open.iter().rposition(|entry| {
