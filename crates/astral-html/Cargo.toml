@@ -20,11 +20,16 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 [dev-dependencies]
 insta = { version = "1.48.0", default-features = false }
 serde_json.workspace = true
+criterion.workspace = true
 
 [lints]
 workspace = true
 
 [[bench]]
 name = "parse"
+harness = false
+
+[[bench]]
+name = "parse_codspeed"
 harness = false
 
