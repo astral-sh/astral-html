@@ -1,4 +1,4 @@
-//! An HTML parser.
+//! A high-performance HTML parser for document traversal.
 //!
 //! [`Reader`] yields tokens in source order and selects HTML text states.
 //! [`Tokenizer`] gives callers explicit control over those states. [`Document`]

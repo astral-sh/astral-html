@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "An HTML parser"
+description = "A high-performance HTML parser for document traversal."
 
 [features]
 benchmark-jemalloc = ["dep:tikv-jemallocator"]
