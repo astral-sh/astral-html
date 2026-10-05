@@ -109,6 +109,8 @@ pub struct Tokenizer<'a> {
     position: usize,
     state: State,
     last_start_tag: Option<Cow<'static, str>>,
+    // Only large tags need an index; keep its allocation for subsequent tags.
+    attribute_names: Option<HashSet<Cow<'a, str>>>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -131,6 +133,7 @@ impl<'a> Tokenizer<'a> {
             last_start_tag: last_start_tag
                 .filter(|name| can_end_text(name))
                 .map(|name| Cow::Owned(name.to_ascii_lowercase())),
+            attribute_names: None,
         }
     }
 
@@ -236,7 +239,6 @@ impl<'a> Tokenizer<'a> {
         attribute_buffer: &mut Vec<Attribute<'a>>,
     ) -> Option<(Vec<Attribute<'a>>, bool)> {
         let mut attributes = std::mem::take(attribute_buffer);
-        let mut seen: Option<HashSet<Cow<'a, str>>> = None;
         let mut self_closing = false;
         loop {
             self.whitespace();
@@ -290,14 +292,11 @@ impl<'a> Tokenizer<'a> {
                     .iter()
                     .any(|attribute| attribute.name == attr_name)
             } else {
-                !seen
-                    .get_or_insert_with(|| {
-                        attributes
-                            .iter()
-                            .map(|attribute| attribute.name.clone())
-                            .collect()
-                    })
-                    .insert(attr_name.clone())
+                let seen = self.attribute_names.get_or_insert_with(HashSet::new);
+                if seen.is_empty() {
+                    seen.extend(attributes.iter().map(|attribute| attribute.name.clone()));
+                }
+                !seen.insert(attr_name.clone())
             };
             if !duplicate {
                 attributes.push(Attribute {
@@ -306,6 +305,9 @@ impl<'a> Tokenizer<'a> {
                     raw_value,
                 });
             }
+        }
+        if let Some(seen) = &mut self.attribute_names {
+            seen.clear();
         }
         Some((attributes, self_closing))
     }
