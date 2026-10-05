@@ -56,6 +56,17 @@ jobs:
       - name: Verify release package
         run: cargo publish -p astral-html --dry-run --locked
 
+      - name: Verify release notes
+        run: |
+          awk -v version="$VERSION" '
+            $0 == "## " version { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.txt"
+          test -s "$RUNNER_TEMP/notes.txt"
+        env:
+          VERSION: ${{ inputs.version }}
+
   release-gate:
     # N.B. This name should not change; the release environment gate relies on it.
     name: release-gate
@@ -129,9 +140,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Create GitHub release and tag
         shell: bash
         run: |
+          awk -v version="$VERSION" '
+            $0 == "## " version { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.txt"
+          test -s "$RUNNER_TEMP/notes.txt"
           prerelease=()
           if [[ "$VERSION" == *-* ]]; then
             prerelease+=(--prerelease)
@@ -140,7 +162,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$RELEASE_COMMIT" \
             --title "astral-html v${VERSION}" \
-            --generate-notes \
+            --notes-file "$RUNNER_TEMP/notes.txt" \
             "${prerelease[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
