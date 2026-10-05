@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::FusedIterator;
 
-use memchr::{memchr, memchr_iter, memchr2, memchr3};
+use memchr::{memchr, memchr_iter, memchr2, memchr3, memmem};
 
 use crate::entities::{decode, decode_from, normalize};
 
@@ -326,8 +326,18 @@ impl<'a> Tokenizer<'a> {
     #[inline]
     fn comment(&mut self) -> Token<'a> {
         let rest = &self.source[self.position..];
-        if let Some(end) = memchr3(b'-', b'<', b'>', rest.as_bytes())
-            && rest[end..].starts_with("-->")
+        let end = memchr3(b'-', b'<', b'>', rest.as_bytes()).and_then(|at| {
+            if rest[at..].starts_with("-->") {
+                Some(at)
+            } else if at == 0 && (rest.starts_with('>') || rest.starts_with("->")) {
+                None
+            } else {
+                memmem::find(&rest.as_bytes()[at..], b"--")
+                    .map(|offset| at + offset)
+                    .filter(|&end| rest[end..].starts_with("-->"))
+            }
+        });
+        if let Some(end) = end
             && memchr2(b'\r', 0, &rest.as_bytes()[..end]).is_none()
         {
             self.position += end + 3;
@@ -976,6 +986,25 @@ mod tests {
     use std::borrow::Cow;
 
     use super::replace_null;
+
+    #[test]
+    fn ordinary_comments_borrow_punctuation() {
+        for text in [
+            "generated-by tool <meta> and > punctuation",
+            "-leading and mid-word",
+            "<!",
+            "é 🦀 - < >",
+        ] {
+            let source = format!("<!--{text}-->");
+            let mut tokenizer = super::Tokenizer::new(&source);
+            assert!(matches!(
+                tokenizer.next(),
+                Some(super::Token::Comment(Cow::Borrowed(value))) if value == text
+            ));
+            assert_eq!(tokenizer.position(), source.len());
+            assert!(tokenizer.next().is_none());
+        }
+    }
 
     #[test]
     fn owned_null_replacement_reuses_spare_capacity() {
