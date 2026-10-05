@@ -1,7 +1,4 @@
 /target/
-/benchmarks/target/
-/benchmarks/runs/
-__pycache__/
 /fuzz/target/
 /fuzz/artifacts/
 /fuzz/coverage/

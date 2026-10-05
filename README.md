@@ -14,7 +14,7 @@ astral-html provides a borrowed event reader and immutable document views. It im
 
 <p align="center">
   <i>Extracting 2,099 links from the PEP index with warm input on a shared AMD EPYC VM; astral-html uses Reader.
-  <a href="benchmarks/results/README.md">Measurements and methodology</a>.</i>
+  <a href="https://github.com/viarius-experiments/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md">Measurements and methodology</a>.</i>
 </p>
 
 ```rust
