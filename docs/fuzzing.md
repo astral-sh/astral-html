@@ -64,7 +64,7 @@ imports the fixture corpus before each campaign. Successful default-branch runs
 cache generated inputs for later campaigns.
 
 Inputs are limited to 16 KiB, with a five-second timeout and 2 GiB
-resident-memory ceiling. Every job retains compiler and revision metadata, input
+resident-memory limit. Every job retains compiler and revision metadata, input
 hashes, logs, generated inputs, and failure artifacts for 30 days. Short
 campaigns do not establish sustained coverage; larger inputs need separate
 validation.

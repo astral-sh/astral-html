@@ -1,4 +1,4 @@
-//! Reader-token API contracts beyond the upstream conformance corpus.
+//! Tokenizer API contracts beyond the upstream conformance corpus.
 
 use std::borrow::Cow;
 

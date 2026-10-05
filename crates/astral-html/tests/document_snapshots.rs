@@ -1,4 +1,4 @@
-//! Generic document behavior, rendered through the public query APIs.
+//! Document query snapshots.
 
 use std::fmt::Write;
 
