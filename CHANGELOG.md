@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.2
+
+Released on 2026-10-05.
+
+### Other changes
+
+- Show the full repository README, including examples and benchmarks, on
+  crates.io
+  ([astral-sh/astral-html#69](https://github.com/astral-sh/astral-html/pull/69))
+
 ## 0.0.1
 
 Released on 2026-10-05.
