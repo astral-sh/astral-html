@@ -23,7 +23,3 @@ workspace = true
 name = "parse"
 harness = false
 
-[[bench]]
-name = "parse_codspeed"
-harness = false
-

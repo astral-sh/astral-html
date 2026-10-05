@@ -65,10 +65,6 @@ pub(crate) fn cases() -> Vec<Case> {
     cases.extend(scanning_cases());
     cases.extend(entity_scanning_cases());
 
-    if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
-        cases.retain(|case| case.name.contains(&filter));
-    }
-    assert!(!cases.is_empty(), "ASTRAL_HTML_BENCH_CASE matched no cases");
     cases
 }
 

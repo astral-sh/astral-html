@@ -10,21 +10,21 @@ package validation, network requests, and resolution are excluded.
 cargo bench -p astral-html --bench parse --locked
 ```
 
-Both benchmark targets run all 58 cases by default using the system allocator.
+The Criterion harness runs all 58 cases by default using the system allocator.
 The inputs include captured and generated package indexes, all 32 pinned uv HTML
 fixtures, many attributes, long text, entities, names, comments, scripts, and
 repeated small text-mode elements. Entity cases cover uncommon and unknown
 references and long text prefixes.
 
-| Variable                      | Default   | Purpose                          |
-| ----------------------------- | --------- | -------------------------------- |
-| `ASTRAL_HTML_BENCH_CASE`      | All cases | Filter case names by substring.  |
-| `ASTRAL_HTML_BENCH_SAMPLES`   | `21`      | Samples per case; at least 3.    |
-| `ASTRAL_HTML_BENCH_SAMPLE_MS` | `100`     | Warmup duration in milliseconds. |
+Pass a name filter and Criterion options after `--` to select cases and adjust
+sampling. Warmup and measurement times are in seconds:
 
-Warmup chooses an iteration count for each case. CSV output contains median,
-10th percentile, and 90th percentile runtimes and throughput; the percentiles
-describe sample variation, not confidence intervals.
+```console
+cargo bench -p astral-html --bench parse --locked -- root-10000-generated --sample-size 20 --warm-up-time 1 --measurement-time 3
+```
+
+Criterion reports timings and throughput, saves results under
+`target/criterion`, and compares against the previous run.
 
 Pin the executable to one available CPU with `taskset -c <cpu>` on Linux and
 repeat runs with the same binary. Record the source revision, compiler, CPU,
@@ -41,10 +41,9 @@ does not measure uv-client end to end.
 The [benchmark workflow](../.github/workflows/benchmarks.yml) follows
 [Ruff's CodSpeed setup](https://github.com/astral-sh/ruff/blob/ca53cef36054b5a9322e6897fe860e8ed5e00c1d/.github/workflows/ci.yaml).
 It runs all cases in one job on pull requests, pushes to `main`, and manual
-dispatches, recording CPU simulation and memory measurements. The
-`parse_codspeed` target shares inputs with `parse` and includes parsing, field
-extraction, and output destruction in each measurement. Input construction
-happens outside the measured region.
+dispatches, recording CPU simulation and memory measurements. The same `parse`
+harness runs locally with Criterion and in CI with CodSpeed instrumentation.
+Input construction happens outside the measured region.
 
 The workflow uses the system allocator and the existing `profiling` Cargo
 profile for symbolized results. Enable `astral-sh/astral-html` in the CodSpeed
@@ -55,30 +54,27 @@ To build and check the instrumented benchmarks locally:
 
 ```console
 cargo install cargo-codspeed --version 5.0.1 --locked
-cargo codspeed build -m simulation -m memory --profile profiling -p astral-html --bench parse_codspeed --locked
-cargo codspeed run
+cargo codspeed build -m simulation -m memory --profile profiling -p astral-html --bench parse --locked
+cargo codspeed run --bench parse
 ```
 
 `cargo codspeed run` validates the instrumented benchmarks locally; collection
-and upload happen inside the CodSpeed action in CI. `ASTRAL_HTML_BENCH_CASE`
-filters inputs for both targets. The custom sampling and profiling variables
-apply only to `parse`. For local Criterion timings:
-
-```console
-cargo bench -p astral-html --bench parse_codspeed --locked
-```
+and upload happen inside the CodSpeed action in CI. Append a name filter to run
+selected cases, for example
+`cargo codspeed run --bench parse root-10000-generated`.
 
 ## Profiling
 
-Select one case for a fixed iteration count:
+Select one case and run it for approximately 10 seconds without statistical
+analysis or saving results:
 
 ```console
-ASTRAL_HTML_BENCH_CASE=root-10000-generated ASTRAL_HTML_BENCH_PROFILE=1 ASTRAL_HTML_BENCH_PROFILE_ITERATIONS=5 cargo bench -p astral-html --bench parse --locked
+cargo bench -p astral-html --bench parse --profile profiling --locked -- root-10000-generated --profile-time 10
 ```
 
-The iteration count defaults to 100,000. Profiling skips warmup and sampling.
-Attach a profiler to the compiled executable with `--bench`; `measure` bounds
-parsing, extraction, and output destruction.
+Attach a profiler to the compiled executable with
+`--bench root-10000-generated --profile-time 10`. The `profiling` Cargo profile
+includes debug symbols.
 
 Running the executable without `--bench`, or with `--test`, parses and extracts
 each selected input once without collecting timings. This is also how
