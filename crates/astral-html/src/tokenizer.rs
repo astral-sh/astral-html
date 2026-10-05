@@ -8,6 +8,8 @@ use memchr::{memchr, memchr_iter, memchr2, memchr3, memmem};
 
 use crate::entities::{decode, decode_from, normalize};
 
+const MAX_RETAINED_ATTRIBUTE_CAPACITY: usize = 256;
+
 /// A tokenizer state selected by the caller or a tree builder.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub enum State {
@@ -109,7 +111,7 @@ pub struct Tokenizer<'a> {
     position: usize,
     state: State,
     last_start_tag: Option<Cow<'static, str>>,
-    // Only large tags need an index; keep its allocation for subsequent tags.
+    // Only large tags need an index; retain ordinary allocations for subsequent tags.
     attribute_names: Option<HashSet<Cow<'a, str>>>,
 }
 
@@ -307,7 +309,12 @@ impl<'a> Tokenizer<'a> {
             }
         }
         if let Some(seen) = &mut self.attribute_names {
-            seen.clear();
+            // Clearing a populated set takes O(capacity), so do not retain oversized tables.
+            if seen.capacity() > MAX_RETAINED_ATTRIBUTE_CAPACITY {
+                self.attribute_names = None;
+            } else {
+                seen.clear();
+            }
         }
         Some((attributes, self_closing))
     }
