@@ -11,5 +11,5 @@ The conformance target is WHATWG tokenization, not browser tree construction.
 See the [repository](https://github.com/astral-sh/astral-html) for conformance,
 fuzzing, and benchmarks.
 
-Licensed under MIT OR Apache-2.0. The generated character-reference data retains
-the [CPython license](licenses/CPython.txt).
+The parser code is licensed under MIT OR Apache-2.0. The generated
+character-reference data is licensed under [BSD-3-Clause](licenses/WHATWG.txt).
