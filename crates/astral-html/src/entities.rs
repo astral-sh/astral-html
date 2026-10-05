@@ -131,16 +131,13 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
     }
 
     // Common semicolon-terminated references need no contextual lookahead.
-    let common = match bytes {
-        [b'g', b't', b';', ..] => Some((3, ">")),
-        [b'l', b't', b';', ..] => Some((3, "<")),
-        [b'a', b'm', b'p', b';', ..] => Some((4, "&")),
-        [b'q', b'u', b'o', b't', b';', ..] => Some((5, "\"")),
-        [b'a', b'p', b'o', b's', b';', ..] => Some((5, "'")),
-        _ => None,
-    };
-    if let Some((length, value)) = common {
-        return Some((length, Replacement::Named(value)));
+    match bytes {
+        [b'g', b't', b';', ..] => return Some((3, Replacement::Named(">"))),
+        [b'l', b't', b';', ..] => return Some((3, Replacement::Named("<"))),
+        [b'a', b'm', b'p', b';', ..] => return Some((4, Replacement::Named("&"))),
+        [b'q', b'u', b'o', b't', b';', ..] => return Some((5, Replacement::Named("\""))),
+        [b'a', b'p', b'o', b's', b';', ..] => return Some((5, Replacement::Named("'"))),
+        _ => {}
     }
 
     // Bound unknown names by the longest WHATWG reference (32 bytes including `;`).
