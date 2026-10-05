@@ -1,0 +1,14 @@
+{
+  "astral-tl-MIT.txt": "https://github.com/astral-sh/astral-tl/blob/04bbd94a054e164a3d057160977197ca25194bc5/LICENSE",
+  "rust-book-MIT.txt": "https://github.com/rust-lang/book/blob/b1f6e062b48458c7b32fd4232d486df04af8153a/LICENSE-MIT",
+  "mdbook-MPL-2.0.txt": "https://github.com/rust-lang/mdBook/blob/94b922d27aea47183ebf270e2f6f32561d960852/LICENSE",
+  "pep-sphinx-CC0.txt": "https://github.com/python/peps/blob/730372f74cd1c200170478fb91a9b3f07a737acd/pep_sphinx_extensions/LICENCE.rst",
+  "CC0-1.0.txt": "https://github.com/spdx/license-list-data/blob/31ba1a50e5397e00a304dbadc76531740e89ee48/text/CC0-1.0.txt",
+  "furo-MIT.txt": "https://github.com/pradyunsg/furo/blob/7b0cb83657e744b667bf6888671e3455d6481f7e/LICENSE",
+  "just-the-docs-MIT.txt": "https://github.com/just-the-docs/just-the-docs/blob/b266af39dc8aa3f8b55c719e6d775e23d6eb339a/LICENSE.txt",
+  "tabler-icons-MIT.txt": "https://github.com/tabler/tabler-icons/blob/ade3197c0912f867325059dc126a4c5b6aceeba1/LICENSE",
+  "feather-MIT.txt": "https://github.com/feathericons/feather/blob/3dc050d97405062eba78aa57115c0a15c63abdaa/LICENSE",
+  "bootstrap-MIT.txt": "https://github.com/twbs/bootstrap/blob/25aa8cc0b32f0d1a54be575347e6d84b70b1acd7/LICENSE",
+  "bootstrap-icons-MIT.txt": "https://github.com/twbs/icons/blob/6945b7006285d444cc17ff2e22c7691719229526/LICENSE",
+  "pep8-public-domain.txt": "https://github.com/python/peps/blob/730372f74cd1c200170478fb91a9b3f07a737acd/peps/pep-0008.rst#copyright"
+}

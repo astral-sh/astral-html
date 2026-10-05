@@ -1,5 +1,7 @@
 # Performance
 
+The isolated [comparison workspace](../benchmarks/README.md) benchmarks other HTML crates on pinned real pages and produces reports with raw samples and environment metadata. Its dependencies are separate from the parser crate.
+
 The benchmark measures `astral-html` parsing, extraction of the HTML fields
 consumed by uv, and destruction of the output. Input creation,
 URL handling, package validation, network requests, and resolution are excluded.

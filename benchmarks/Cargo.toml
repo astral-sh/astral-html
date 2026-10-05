@@ -1,0 +1,31 @@
+[package]
+name = "html-benchmarks"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace]
+members = ["."]
+
+[dependencies]
+astral-html = { path = "../crates/astral-html" }
+tl = { package = "astral-tl", version = "=0.8.0", default-features = false }
+html5gum = "=0.8.4"
+html5ever = "=0.39.0"
+scraper = { version = "=0.27.0", default-features = false }
+lol_html = "=3.0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+
+[dev-dependencies]
+criterion = { version = "=0.8.2", features = ["html_reports"] }
+
+[[bench]]
+name = "workloads"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

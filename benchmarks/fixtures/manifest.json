@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "iniconfig",
+      "title": "PyPI Simple API response for iniconfig",
+      "file": "iniconfig.html",
+      "source_url": "https://github.com/astral-sh/astral-tl/blob/04bbd94a054e164a3d057160977197ca25194bc5/benches/tl.rs",
+      "revision": "04bbd94a054e164a3d057160977197ca25194bc5",
+      "license": "MIT",
+      "license_files": [
+        "licenses/astral-tl-MIT.txt"
+      ],
+      "sha256": "470b4150301f29038e0eeea63d4a13fba17e4563c32c2005ef71a99c87196b4b",
+      "bytes": 6144,
+      "category": "package-index"
+    },
+    {
+      "id": "rust-book",
+      "title": "The Rust Programming Language: Programming a Guessing Game",
+      "file": "rust-book.html",
+      "source_url": "https://github.com/rust-lang/book/blob/5f5c30341e253651144a6195a17f8c209867e1cd/ch02-00-guessing-game-tutorial.html",
+      "revision": "5f5c30341e253651144a6195a17f8c209867e1cd",
+      "license": "MIT (book); MPL-2.0 (mdBook template)",
+      "license_files": [
+        "licenses/rust-book-MIT.txt",
+        "licenses/mdbook-MPL-2.0.txt"
+      ],
+      "sha256": "aa8de0e676c6fb67baa46e3bd124eda2c7226864d18edf6d8d520f5edc0805d4",
+      "bytes": 88978,
+      "category": "documentation"
+    },
+    {
+      "id": "pep8",
+      "title": "PEP 8: Style Guide for Python Code",
+      "file": "pep8.html",
+      "source_url": "https://github.com/python/peps/blob/73849c82abc9b9061664b2e2a064019f80c496db/pep-0008/index.html",
+      "revision": "73849c82abc9b9061664b2e2a064019f80c496db",
+      "license": "Public domain (PEP); CC0-1.0 (theme); MIT (icons)",
+      "license_files": [
+        "licenses/pep8-public-domain.txt",
+        "licenses/pep-sphinx-CC0.txt",
+        "licenses/CC0-1.0.txt",
+        "licenses/furo-MIT.txt",
+        "licenses/just-the-docs-MIT.txt",
+        "licenses/tabler-icons-MIT.txt",
+        "licenses/feather-MIT.txt"
+      ],
+      "sha256": "9f4e669bee0fab4b1b0e60321b9ca8822b2f1e61a6ebe0243760294eaba0248e",
+      "bytes": 121592,
+      "category": "article"
+    },
+    {
+      "id": "pep-index",
+      "title": "PEP 0: Index of Python Enhancement Proposals",
+      "file": "pep-index.html",
+      "source_url": "https://github.com/python/peps/blob/73849c82abc9b9061664b2e2a064019f80c496db/pep-0000/index.html",
+      "revision": "73849c82abc9b9061664b2e2a064019f80c496db",
+      "license": "CC0-1.0 (index generator and theme); MIT (icons)",
+      "license_files": [
+        "licenses/pep-sphinx-CC0.txt",
+        "licenses/CC0-1.0.txt",
+        "licenses/furo-MIT.txt",
+        "licenses/just-the-docs-MIT.txt",
+        "licenses/tabler-icons-MIT.txt",
+        "licenses/feather-MIT.txt"
+      ],
+      "sha256": "e802e5171042a7a438be2a98b510fb562df534ab5caad4c7de80d02cf8be3a77",
+      "bytes": 418744,
+      "category": "table-index"
+    },
+    {
+      "id": "bootstrap-dashboard",
+      "title": "Bootstrap Dashboard Example",
+      "file": "bootstrap-dashboard.html",
+      "source_url": "https://github.com/twbs/bootstrap/blob/87d080b9b89bac4ed7d3bb99006c1fc2c073cb6e/docs/5.3/examples/dashboard/index.html",
+      "revision": "87d080b9b89bac4ed7d3bb99006c1fc2c073cb6e",
+      "license": "MIT",
+      "license_files": [
+        "licenses/bootstrap-MIT.txt",
+        "licenses/bootstrap-icons-MIT.txt"
+      ],
+      "sha256": "ed4985cfa430946da8f4476a9d89385265558a91d9ac8758fd323170f9aee004",
+      "bytes": 21876,
+      "category": "application"
+    }
+  ]
+}
