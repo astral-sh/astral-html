@@ -2,7 +2,7 @@
 //!
 //! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
 //! names, comments, and scripts; `entity-scanning` covers references and long
-//! text/attribute prefixes. The default suite includes captured and generated
+//! text prefixes. The default suite includes captured and generated
 //! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
 //! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=astral|baseline`.
 //! `ASTRAL_HTML_BENCH_PROFILE_ITERATIONS` sets a positive iteration count (default: 100000).
@@ -308,7 +308,5 @@ fn entity_scanning_cases() -> Vec<Case> {
         ("entities-rare-generated", r#"<a href="/demo.whl?x=&CounterClockwiseContourIntegral;&NotEqual;&Acy;&dHar;">demo</a>"#.repeat(512)),
         ("entities-unknown-generated", r#"<a href="/demo.whl?x=&DefinitelyNotAnEntityNameAtAll;&unknown=foo&notit=bar">demo</a>"#.repeat(512)),
         ("text-prefix-64k-generated", format!("{}&amp;<a href=/demo.whl>demo</a>", "x".repeat(65_536))),
-        ("attribute-prefix-64k-generated", format!(r#"<a href="/{}.whl?x=&amp;">demo</a>"#, "x".repeat(65_536))),
-        ("attribute-plain-64k-generated", format!(r#"<a href="/{}.whl">demo</a>"#, "x".repeat(65_536))),
     ].into_iter().map(|(name, input)| Case {name, input, root_index: false}).collect()
 }
