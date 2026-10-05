@@ -297,3 +297,16 @@ fn long_script_runs_preserve_escape_transitions() {
     assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
     assert_eq!(tokenizer.next(), None);
 }
+
+#[test]
+fn doctype_names_borrow_clean_and_common_normalized_spellings() {
+    for name in ["custom-name", "html", "HTML"] {
+        let source = format!("<!DOCTYPE {name}>");
+        let Some(Token::Doctype(doctype)) = Tokenizer::new(&source).next() else {
+            panic!("expected doctype");
+        };
+        assert!(
+            matches!(doctype.name, Some(Cow::Borrowed(value)) if value == name.to_ascii_lowercase())
+        );
+    }
+}

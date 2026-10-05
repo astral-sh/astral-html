@@ -1,7 +1,7 @@
 //! Measure parse-and-extract workloads.
 //!
 //! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
-//! names, comments, and scripts; `entity-scanning` covers references and long
+//! names, nesting, comments, and scripts; `entity-scanning` covers references and long
 //! text prefixes. The default suite includes captured and generated
 //! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
 //! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=1`.
@@ -232,8 +232,31 @@ fn scanning_cases() -> Vec<Case> {
     );
     [
         (
+            "deep-balanced-generated",
+            format!("{}text{}", "<section>".repeat(128), "</section>".repeat(128)),
+        ),
+        (
+            "deep-unmatched-generated",
+            format!(
+                "{}{}text{}",
+                "<section>".repeat(128),
+                "</missing>".repeat(1_024),
+                "</section>".repeat(128)
+            ),
+        ),
+        (
             "names-generated",
             "<PaCkAgE DaTa-CuStOm='record'><A HrEf='/demo.whl'>demo</A></PaCkAgE>".repeat(128),
+        ),
+        (
+            "names-long-custom-generated",
+            format!(
+                "<custom-{}X data-{}Y='x'>text</custom-{}X>",
+                "name-".repeat(32),
+                "attribute-".repeat(16),
+                "name-".repeat(32)
+            )
+            .repeat(128),
         ),
         (
             "comment-plain-generated",
@@ -292,6 +315,8 @@ fn entity_scanning_cases() -> Vec<Case> {
     [
         ("entities-rare-generated", r#"<a href="/demo.whl?x=&CounterClockwiseContourIntegral;&NotEqual;&Acy;&dHar;">demo</a>"#.repeat(512)),
         ("entities-unknown-generated", r#"<a href="/demo.whl?x=&DefinitelyNotAnEntityNameAtAll;&unknown=foo&notit=bar">demo</a>"#.repeat(512)),
+        ("entities-unknown-text-generated", format!("<p>{}</p><a href=/demo.whl>demo</a>", "&DefinitelyNotAnEntityNameAtAll; &CounterClockwiseContourIntegral &zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz; ".repeat(512))),
+        ("entities-legacy-text-generated", format!("<p>{}</p><a href=/demo.whl>demo</a>", "&notit; &AEligabcdefghijklmnopqrstuvwxyz; &copycat &notin ".repeat(512))),
         ("text-prefix-64k-generated", format!("{}&amp;<a href=/demo.whl>demo</a>", "x".repeat(65_536))),
     ].into_iter().map(|(name, input)| Case {name, input, root_index: false}).collect()
 }
