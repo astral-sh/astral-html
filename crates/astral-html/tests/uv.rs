@@ -14,6 +14,26 @@ fn uv_html_extraction_matches_astral_tl() {
 }
 
 #[test]
+fn uv_base_and_metadata_distinguish_boolean_and_empty_attributes() {
+    for (href, content, expected) in [
+        ("", "", None),
+        (" href", " content", None),
+        (" href=\"\"", " content=\"\"", Some("")),
+    ] {
+        for name in ["pypi:project-status", "pypi:project-status-reason"] {
+            let input = format!("<head><base{href}><meta name=\"{name}\"{content}></head>");
+            let index = support::astral(&input, false);
+            assert_eq!(index, support::baseline(&input, false), "{input}");
+            assert_eq!(index.base.as_deref(), expected);
+            assert_eq!(
+                index.status,
+                [(name.to_owned(), expected.map(str::to_owned))]
+            );
+        }
+    }
+}
+
+#[test]
 fn extracts_uv_project_fields() {
     let input = include_str!("fixtures/uv/parse_simple_html_case_insensitively.html");
     let index = support::astral(input, false);
