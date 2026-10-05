@@ -27,5 +27,3 @@ Names use ASCII case folding. Duplicate attributes keep the first normalized nam
 Generic document and reader tests use Insta inline snapshots of public API results. They cover lexical scopes, traversal, attributes, decoded text, text modes, and malformed-input recovery. Inputs and expected output appear together in each test.
 
 Direct assertions also check resource-limit boundaries, borrowing, source positions, permanent exhaustion, attribute deduplication, and deep traversal. The tokenizer corpus remains the token-output conformance check.
-
-The separate [uv integration workflow](uv.md) applies the adapter and runs all 31 upstream HTML tests unchanged. The 32 pinned inputs remain available as benchmark fixtures.

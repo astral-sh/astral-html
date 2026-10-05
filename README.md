@@ -34,11 +34,10 @@ for element in document.elements().filter(|element| element.is("a")) {
 
 - [Conformance](docs/conformance.md): tokenizer and document semantics.
 - [Resource limits](docs/safety.md): allocation and input bounds.
-- [uv integration](docs/uv.md): compatibility tests and adapter.
 - [Fuzzing](docs/fuzzing.md): targets, oracles, and commands.
 - [Benchmarks](docs/performance.md): parsing and field extraction workloads.
 
-The library is pre-release. Adoption in uv still requires its broader index and resolver integration tests.
+The library is pre-release.
 
 ## Development
 
@@ -48,7 +47,7 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo bench -p astral-html --bench parse --features benchmark-jemalloc --locked
 ```
 
-CI tests AMD64 and ARM64 on Ubuntu 24.04 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, uv compatibility, and AddressSanitizer fuzz targets.
+CI tests AMD64 and ARM64 on Ubuntu 24.04 with the minimum supported Rust version and stable Rust. It also checks formatting, documentation, packaging, and AddressSanitizer fuzz targets.
 
 ## License
 
