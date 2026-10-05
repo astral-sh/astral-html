@@ -24,7 +24,7 @@ class Node:
 def compact_trie(table):
     """Pack ASCII name paths, preserving terminal prefixes and sorted children."""
     root = Node()
-    for name, value in sorted(table.items()):
+    for name, value in table.items():
         node = root
         for char in name.removesuffix(";"):
             node = node.children.setdefault(char, Node())
