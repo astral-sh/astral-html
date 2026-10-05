@@ -1,6 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" class="marks" width="585" height="167" viewBox="0 0 585 167">
   <title>Link extraction from the PEP index</title>
-  <desc>2,099 links from 418,744 bytes of warm HTML input. Median of 3 session means; lower is better. astral-html uses Reader. Source 952e116f351d183560c8d758c28b8bafdf6549ce. Shared KVM VM on AMD EPYC. Affinity pins a guest vCPU; physical-core exclusivity, host scheduling, frequency/power policy, and neighbor load are not controlled.</desc>
+  <desc>2,099 links from 418,744 bytes of warm HTML input. Median of 3 session means; lower is better. astral-html uses Reader. Source 58a28da8420cc71f1f829372769ae4d1d036e85e. Shared KVM VM on AMD EPYC. Affinity pins a guest vCPU; physical-core exclusivity, host scheduling, frequency/power policy, and neighbor load are not controlled.</desc>
+  <!--
+Adapted from Ruff's README benchmark SVG:
+https://user-images.githubusercontent.com/1309177/232603516-4fb4892d-585c-4b20-b810-3db9161831e4.svg
+
+MIT License
+
+Copyright (c) 2022 Charles Marsh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
   <g fill="none" stroke-miterlimit="10" transform="translate(85,5)">
     <g class="mark-group role-frame root" role="graphics-object" aria-roledescription="group mark container">
       <g transform="translate(0,0)">
@@ -20,7 +46,7 @@
               <path class="foreground" aria-hidden="true" d="" pointer-events="none" display="none" />
             </g>
           </g>
-          <g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="X-axis: time in milliseconds from 0 to 12">
+          <g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="X-axis: time in milliseconds from 0 to 15">
             <g transform="translate(0.5,140.5)">
               <path class="background" aria-hidden="true" d="M0,0h0v0h0Z" pointer-events="none" />
               <g>
@@ -32,21 +58,21 @@
                 </g>
                 <g class="mark-text role-axis-label" pointer-events="none">
                   <text text-anchor="middle" transform="translate(0,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">0ms</text>
-                  <text text-anchor="middle" transform="translate(161,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">4ms</text>
-                  <text text-anchor="middle" transform="translate(322,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">8ms</text>
-                  <text text-anchor="middle" transform="translate(483,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">12ms</text>
+                  <text text-anchor="middle" transform="translate(161,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">5ms</text>
+                  <text text-anchor="middle" transform="translate(322,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">10ms</text>
+                  <text text-anchor="middle" transform="translate(483,15)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">15ms</text>
                 </g>
               </g>
               <path class="foreground" aria-hidden="true" d="" pointer-events="none" display="none" />
             </g>
           </g>
-          <g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="Y-axis: astral-html, astral-tl, lol_html, html5gum, scraper">
+          <g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="Y-axis: astral-html, tl, lol_html, html5gum, scraper">
             <g transform="translate(0.5,0.5)">
               <path class="background" aria-hidden="true" d="M0,0h0v0h0Z" pointer-events="none" />
               <g>
                 <g class="mark-text role-axis-label" pointer-events="none">
                   <text text-anchor="end" transform="translate(-10,17.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1" font-weight="bold">astral-html</text>
-                  <text text-anchor="end" transform="translate(-10,45.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">astral-tl</text>
+                  <text text-anchor="end" transform="translate(-10,45.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">tl</text>
                   <text text-anchor="end" transform="translate(-10,73.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">lol_html</text>
                   <text text-anchor="end" transform="translate(-10,101.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">html5gum</text>
                   <text text-anchor="end" transform="translate(-10,129.5)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" opacity="1">scraper</text>
@@ -56,18 +82,18 @@
             </g>
           </g>
           <g class="mark-rect role-mark layer_0_marks" role="graphics-object" aria-roledescription="rect mark container">
-            <path aria-label="time: 1.278470317ms; tool: astral-html" role="graphics-symbol" aria-roledescription="bar" d="M0,7.5h51.458430263v13h-51.458430263Z" fill="#6340AC" />
-            <path aria-label="time: 1.545822291ms; tool: astral-tl" role="graphics-symbol" aria-roledescription="bar" d="M0,35.5h62.219347213v13h-62.219347213Z" fill="#6340AC" />
-            <path aria-label="time: 2.764057163ms; tool: lol_html" role="graphics-symbol" aria-roledescription="bar" d="M0,63.5h111.253300800v13h-111.253300800Z" fill="#6340AC" />
-            <path aria-label="time: 2.834910535ms; tool: html5gum" role="graphics-symbol" aria-roledescription="bar" d="M0,91.5h114.105149015v13h-114.105149015Z" fill="#6340AC" />
-            <path aria-label="time: 10.489410420ms; tool: scraper" role="graphics-symbol" aria-roledescription="bar" d="M0,119.5h422.198769405v13h-422.198769405Z" fill="#6340AC" />
+            <path aria-label="time: 1.116748134ms; tool: astral-html" role="graphics-symbol" aria-roledescription="bar" d="M0,7.5h35.959289922v13h-35.959289922Z" fill="#6340AC" />
+            <path aria-label="time: 1.766789590ms; tool: tl" role="graphics-symbol" aria-roledescription="bar" d="M0,35.5h56.890624798v13h-56.890624798Z" fill="#6340AC" />
+            <path aria-label="time: 2.857743322ms; tool: lol_html" role="graphics-symbol" aria-roledescription="bar" d="M0,63.5h92.019334963v13h-92.019334963Z" fill="#6340AC" />
+            <path aria-label="time: 2.914333949ms; tool: html5gum" role="graphics-symbol" aria-roledescription="bar" d="M0,91.5h93.841553161v13h-93.841553161Z" fill="#6340AC" />
+            <path aria-label="time: 11.346749060ms; tool: scraper" role="graphics-symbol" aria-roledescription="bar" d="M0,119.5h365.365319732v13h-365.365319732Z" fill="#6340AC" />
           </g>
           <g class="mark-text role-mark layer_1_marks" role="graphics-object" aria-roledescription="text mark container">
-            <text aria-label="time: 1.278470317ms; tool: astral-html" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(57.458430263,18)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" font-weight="bold">1.28ms</text>
-            <text aria-label="time: 1.545822291ms; tool: astral-tl" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(68.219347213,46)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">1.55ms</text>
-            <text aria-label="time: 2.764057163ms; tool: lol_html" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(117.253300800,74)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">2.76ms</text>
-            <text aria-label="time: 2.834910535ms; tool: html5gum" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(120.105149015,102)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">2.83ms</text>
-            <text aria-label="time: 10.489410420ms; tool: scraper" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(428.198769405,130)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">10.49ms</text>
+            <text aria-label="time: 1.116748134ms; tool: astral-html" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(41.959289922,18)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333" font-weight="bold">1.12ms</text>
+            <text aria-label="time: 1.766789590ms; tool: tl" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(62.890624798,46)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">1.77ms</text>
+            <text aria-label="time: 2.857743322ms; tool: lol_html" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(98.019334963,74)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">2.86ms</text>
+            <text aria-label="time: 2.914333949ms; tool: html5gum" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(99.841553161,102)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">2.91ms</text>
+            <text aria-label="time: 11.346749060ms; tool: scraper" role="graphics-symbol" aria-roledescription="text mark" text-anchor="start" transform="translate(371.365319732,130)" font-family="-apple-system,BlinkMacSystemFont,&quot;Segoe UI&quot;,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;" font-size="12px" fill="#333333">11.35ms</text>
           </g>
           <g class="mark-text role-mark layer_2_marks" role="graphics-object" aria-roledescription="text mark container" />
         </g>

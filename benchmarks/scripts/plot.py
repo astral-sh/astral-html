@@ -78,8 +78,10 @@ def render(rows, sessions, links, fixture, metadata, output):
 
     # Retain Ruff's 585×167 viewBox, 483×140 plot, 13px bars, font, and colors.
     width, height = 483, 140
-    magnitude = 10 ** math.floor(math.log10(max(value for _, value in rows) / 3))
-    step = math.ceil(max(value for _, value in rows) / 3 / magnitude) * magnitude
+    # Leave room after the longest bar for its value label.
+    upper = max(value for _, value in rows) * width / (width - 60)
+    magnitude = 10 ** math.floor(math.log10(upper / 3))
+    step = math.ceil(upper / 3 / magnitude) * magnitude
     maximum = step * 3
     for class_name in ["mark-rule role-axis-grid", "mark-rule role-axis-tick"]:
         for index, line in enumerate(group(root, class_name)):
