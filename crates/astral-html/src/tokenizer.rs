@@ -904,7 +904,7 @@ fn is_space(byte: u8) -> bool {
 }
 
 /// Compare a normalized name without ASCII case sensitivity.
-#[inline]
+#[inline(always)]
 pub(crate) fn matches_normalized_name(name: &[u8], candidate: &[u8]) -> bool {
     // The standard comparison processes long names in vector-sized chunks.
     if name.len() >= 16 {
