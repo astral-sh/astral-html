@@ -1,10 +1,10 @@
 # Conformance
 
-Our conformance bar is token output from the
+The tokenizer targets the
 [WHATWG HTML tokenizer](https://html.spec.whatwg.org/multipage/parsing.html#tokenization)
-for already decoded UTF-8 input. We test data, RCDATA, raw text, script data,
-plaintext, and CDATA entry states. The caller supplies the last start tag when a
-fragment needs that context.
+for decoded UTF-8 input. We test data, RCDATA, raw text, script data, plaintext,
+and CDATA entry states. The caller supplies the last start tag when a fragment
+needs that context.
 
 The pinned
 [html5lib corpus](../crates/astral-html/tests/fixtures/html5lib/README.md) runs
@@ -23,8 +23,8 @@ The exclusions are:
 - The corpus's parse-error diagnostics and positions are not compared. The
   tokenizer applies recovery rules but does not expose diagnostics.
 
-This includes malformed tags and attributes, duplicate attributes, comment
-recovery, document type identifiers and quirks flags, all named and numeric
+The tested cases cover malformed tags and attributes, duplicate attributes,
+comment recovery, document type identifiers and quirks flags, named and numeric
 references, script escaping and double escaping, and processing instructions.
 The independent fuzz oracle predates processing instructions; its narrower
 comparison is documented in [fuzzing.md](fuzzing.md).
@@ -60,10 +60,9 @@ whitespace; script and style text remains present.
 
 ## API coverage
 
-Generic document and reader tests use Insta inline snapshots of public API
-results. They cover lexical scopes, traversal, attributes, decoded text, text
-modes, and malformed-input recovery. Inputs and expected output appear together
-in each test.
+Document and reader tests use Insta inline snapshots of public API results. They
+cover lexical scopes, traversal, attributes, decoded text, text modes, and
+malformed-input recovery.
 
 Direct assertions also check resource-limit boundaries, borrowing, source
 positions, permanent exhaustion, attribute deduplication, and deep traversal.

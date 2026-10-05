@@ -1,4 +1,4 @@
-//! Small, readable examples of Reader and fragment-tokenizer contracts.
+//! Reader and fragment-tokenizer snapshots.
 
 use std::borrow::Cow;
 use std::fmt::Write;
