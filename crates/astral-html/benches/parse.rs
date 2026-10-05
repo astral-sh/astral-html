@@ -1,7 +1,8 @@
 //! Compare equivalent parse-and-extract workloads in one process.
 //!
 //! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
-//! names, comments, and scripts. The default suite includes captured and generated
+//! names, comments, and scripts; `entity-scanning` covers references and long
+//! text prefixes. The default suite includes captured and generated
 //! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
 //! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=astral|baseline`.
 //! `ASTRAL_HTML_BENCH_PROFILE_ITERATIONS` sets a positive iteration count (default: 100000).
@@ -38,6 +39,7 @@ fn main() {
             })
             .collect(),
         Ok("scanning") => scanning_cases(),
+        Ok("entity-scanning") => entity_scanning_cases(),
         Err(std::env::VarError::NotPresent) | Ok("default") => vec![
             Case {
                 name: "iniconfig-captured",
@@ -86,7 +88,7 @@ fn main() {
                 root_index: false,
             },
         ],
-        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default, uv, or scanning"),
+        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default, uv, scanning, or entity-scanning"),
     };
 
     if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
@@ -270,6 +272,14 @@ fn scanning_cases() -> Vec<Case> {
             ),
         ),
         (
+            "script-short-1000-generated",
+            "<script>void 0;</script>".repeat(1_000),
+        ),
+        (
+            "text-contexts-1000-generated",
+            "<style>x{}</style><title>x</title><textarea>x</textarea>".repeat(1_000),
+        ),
+        (
             "script-plain-generated",
             format!("<script>{script}</script>"),
         ),
@@ -291,4 +301,12 @@ fn scanning_cases() -> Vec<Case> {
         root_index: false,
     })
     .collect()
+}
+
+fn entity_scanning_cases() -> Vec<Case> {
+    [
+        ("entities-rare-generated", r#"<a href="/demo.whl?x=&CounterClockwiseContourIntegral;&NotEqual;&Acy;&dHar;">demo</a>"#.repeat(512)),
+        ("entities-unknown-generated", r#"<a href="/demo.whl?x=&DefinitelyNotAnEntityNameAtAll;&unknown=foo&notit=bar">demo</a>"#.repeat(512)),
+        ("text-prefix-64k-generated", format!("{}&amp;<a href=/demo.whl>demo</a>", "x".repeat(65_536))),
+    ].into_iter().map(|(name, input)| Case {name, input, root_index: false}).collect()
 }

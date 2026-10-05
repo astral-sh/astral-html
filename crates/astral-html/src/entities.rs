@@ -29,7 +29,7 @@ pub fn decode(input: &str, attribute: bool) -> Cow<'_, str> {
 
 /// Start at an ASCII marker from the initial scan; preceding bytes need no transformation.
 #[inline(never)]
-fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> {
+pub(crate) fn decode_from(input: &str, attribute: bool, mut cursor: usize) -> Cow<'_, str> {
     let bytes = input.as_bytes();
     let mut output = None;
     let mut unchanged = 0;
@@ -130,6 +130,19 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
         return Some((end, Replacement::Character(numeric(number))));
     }
 
+    // Common semicolon-terminated references need no contextual lookahead.
+    let common = match bytes {
+        [b'g', b't', b';', ..] => Some((3, ">")),
+        [b'l', b't', b';', ..] => Some((3, "<")),
+        [b'a', b'm', b'p', b';', ..] => Some((4, "&")),
+        [b'q', b'u', b'o', b't', b';', ..] => Some((5, "\"")),
+        [b'a', b'p', b'o', b's', b';', ..] => Some((5, "'")),
+        _ => None,
+    };
+    if let Some((length, value)) = common {
+        return Some((length, Replacement::Named(value)));
+    }
+
     let initial = match bytes.first()? {
         b'A'..=b'Z' => usize::from(bytes[0] - b'A'),
         b'a'..=b'z' => usize::from(bytes[0] - b'a') + 26,
@@ -158,6 +171,12 @@ fn reference(input: &str, attribute: bool) -> Option<(usize, Replacement)> {
                 return None;
             }
             return Some((length, Replacement::Named(named[index].1)));
+        }
+        // Every legacy name also has a semicolon-terminated spelling. After
+        // this exact lookup fails, any shorter match would therefore be
+        // followed by an ASCII letter or digit, which attributes disallow.
+        if attribute {
+            return None;
         }
     }
     None
@@ -260,7 +279,16 @@ mod tests {
     fn every_named_reference_decodes() {
         assert_eq!(NAMED.len(), 2231);
         for &(name, expected) in NAMED {
-            assert_eq!(decode(&format!("&{name}"), false), expected, "{name}");
+            for attribute in [false, true] {
+                assert_eq!(decode(&format!("&{name}"), attribute), expected, "{name}");
+            }
+            if !name.ends_with(';') {
+                let terminated = format!("{name};");
+                assert!(
+                    NAMED.contains(&(terminated.as_str(), expected)),
+                    "missing terminated spelling for {name}"
+                );
+            }
         }
     }
 }
