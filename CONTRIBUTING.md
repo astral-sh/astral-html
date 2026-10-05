@@ -41,15 +41,13 @@ before running the workflows.
    validate the package and release notes without publishing.
 4. When publishing, approve the protected `release-gate` deployment.
 
-Preparation uses Rooster to classify merged pull requests and determine the next
-version. The `breaking` label selects a minor bump; other changes select a patch
-bump. Internal changes are excluded. The workflow updates the workspace version
-and both Cargo lockfiles, then uses Codex to editorialize the newest changelog
-section and opens a release PR assigned to the person who started the workflow.
+Rooster chooses the next version from merged pull requests: `breaking` selects a
+minor bump, other changes select a patch bump, and internal changes are
+excluded. Preparation updates the workspace version and both Cargo lockfiles,
+rewrites the newest changelog section with Codex, and assigns the release PR to
+the person who started the workflow.
 
-The release workflow verifies that the requested version matches `Cargo.toml`,
-checks the prepared changelog section, performs a Cargo publish dry run, and
-publishes through crates.io Trusted Publishing. After publication succeeds, it
-creates the matching `v<version>` tag and GitHub release using the prepared
-notes. The publish step is the protected `release` deployment and is safe to
-retry if the crate version already exists on crates.io.
+Release validates the version, changelog, and package before publishing through
+Trusted Publishing in the `release` environment. It then creates the
+`v<version>` tag and GitHub release with the prepared notes. Retries skip the
+crate upload if that version already exists on crates.io.

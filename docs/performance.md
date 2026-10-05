@@ -16,9 +16,9 @@ The default suite includes captured and generated package indexes, many
 attributes, long text, and entities. The `uv` suite covers all 32 pinned HTML
 fixtures. The `scanning` suite covers names, comments, scripts, and repeated
 small text-mode elements. The `entity-scanning` suite covers uncommon and
-unknown references and long text prefixes. The optional jemalloc feature matches
-uv's allocator on supported Linux architectures; otherwise the benchmark uses
-the system allocator.
+unknown references and long text prefixes. The jemalloc feature requires Linux
+on x86_64 or aarch64. Otherwise, run without the feature to use the system
+allocator.
 
 | Variable                      | Default   | Purpose                                                          |
 | ----------------------------- | --------- | ---------------------------------------------------------------- |

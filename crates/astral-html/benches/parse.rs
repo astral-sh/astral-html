@@ -1,12 +1,6 @@
 //! Measure parse-and-extract workloads.
 //!
-//! `ASTRAL_HTML_BENCH_SUITE=uv` selects all pinned uv fixtures; `scanning` exercises
-//! names, nesting, comments, and scripts; `entity-scanning` covers references and long
-//! text prefixes. The default suite includes captured and generated
-//! inputs. `ASTRAL_HTML_BENCH_CASE` filters names
-//! by substring. To profile one case, set `ASTRAL_HTML_BENCH_PROFILE=1`.
-//! `ASTRAL_HTML_BENCH_PROFILE_ITERATIONS` sets a positive iteration count (default: 100000).
-//! Profiling requires `--bench`.
+//! See docs/performance.md for inputs and configuration.
 
 mod support;
 
