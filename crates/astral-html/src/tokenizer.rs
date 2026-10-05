@@ -176,7 +176,7 @@ impl<'a> Tokenizer<'a> {
         rest.starts_with(b"</")
             && rest
                 .get(2..2 + name.len())
-                .is_some_and(|candidate| candidate.eq_ignore_ascii_case(name.as_bytes()))
+                .is_some_and(|candidate| matches_normalized_name(name.as_bytes(), candidate))
             && rest
                 .get(2 + name.len())
                 .is_some_and(|&byte| is_space(byte) || matches!(byte, b'/' | b'>'))
@@ -903,6 +903,16 @@ fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
+/// Compare a normalized name by folding ASCII case only in the candidate.
+#[inline]
+pub(crate) fn matches_normalized_name(name: &[u8], candidate: &[u8]) -> bool {
+    name.len() == candidate.len()
+        && name
+            .iter()
+            .zip(candidate)
+            .all(|(&name, &candidate)| name == candidate.to_ascii_lowercase())
+}
+
 /// Fold ASCII case and replace NUL in tag and attribute names.
 #[inline(never)]
 fn normalize_name(input: &str) -> Cow<'_, str> {
@@ -926,7 +936,10 @@ fn normalize_name(input: &str) -> Cow<'_, str> {
             9 => &["plaintext"],
             _ => &[],
         };
-        if let Some(&name) = names.iter().find(|name| name.eq_ignore_ascii_case(input)) {
+        if let Some(&name) = names
+            .iter()
+            .find(|name| matches_normalized_name(name.as_bytes(), input.as_bytes()))
+        {
             return Cow::Borrowed(name);
         }
         replace_null(Cow::Owned(input.to_ascii_lowercase()))

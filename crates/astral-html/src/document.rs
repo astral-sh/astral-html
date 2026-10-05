@@ -6,6 +6,7 @@ use std::fmt;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
+use crate::tokenizer::matches_normalized_name;
 use crate::{Attribute, Reader, Token};
 
 /// Resource limits for constructing a document.
@@ -274,7 +275,7 @@ impl<'doc, 'src> Element<'doc, 'src> {
     /// Compare an HTML element name without ASCII case sensitivity.
     pub fn is(self, name: &str) -> bool {
         let actual = self.name();
-        actual == name || actual.eq_ignore_ascii_case(name)
+        actual == name || matches_normalized_name(actual.as_bytes(), name.as_bytes())
     }
 
     /// Find an attribute without ASCII case sensitivity. The first occurrence wins.
@@ -283,8 +284,10 @@ impl<'doc, 'src> Element<'doc, 'src> {
     /// source spelling.
     #[inline]
     pub fn attribute(self, name: &str) -> Option<&'doc Attribute<'src>> {
-        self.attributes()
-            .find(|attribute| attribute.name == name || attribute.name.eq_ignore_ascii_case(name))
+        self.attributes().find(|attribute| {
+            attribute.name == name
+                || matches_normalized_name(attribute.name.as_bytes(), name.as_bytes())
+        })
     }
 
     /// Test for an attribute, including a boolean attribute with no value.

@@ -223,3 +223,14 @@ fn repeated_names_restore_scopes_after_name_index_promotion() {
     assert!(elements[9].parent().is_none());
     assert_eq!(elements[0].children().count(), 1);
 }
+
+#[test]
+fn name_queries_fold_ascii_letters_only() {
+    let document = Document::parse("<a-é data-é=x data-[=y></a-é>").unwrap();
+    let element = document.elements().next().unwrap();
+    assert!(element.is("A-é"));
+    assert!(!element.is("A-É"));
+    assert_eq!(element.attribute("DATA-é").unwrap().value(), "x");
+    assert!(element.attribute("DATA-É").is_none());
+    assert!(element.attribute("data-{").is_none());
+}
