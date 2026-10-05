@@ -17,9 +17,8 @@ memchr.workspace = true
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["background_threads_runtime_support"], optional = true }
 
 [dev-dependencies]
+insta = { version = "1.48.0", default-features = false }
 serde_json.workspace = true
-astral-tl.workspace = true
-html-escape.workspace = true
 
 [lints]
 workspace = true

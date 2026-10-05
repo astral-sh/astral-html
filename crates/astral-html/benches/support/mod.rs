@@ -4,7 +4,7 @@ use astral_html::Document;
 pub(crate) fn uv_fixtures() -> impl Iterator<Item = (&'static str, &'static str, bool)> {
     macro_rules! fixtures {
         ($root_index:literal; $($name:literal),+ $(,)?) => {
-            [$(($name, include_str!(concat!("../fixtures/uv/", $name, ".html")), $root_index)),+]
+            [$(($name, include_str!(concat!("../../tests/fixtures/uv/", $name, ".html")), $root_index)),+]
         };
     }
     fixtures!(false;
@@ -81,7 +81,7 @@ pub(crate) struct Link {
 }
 
 /// Read the HTML fields that uv needs, without URL or packaging validation.
-pub(crate) fn astral(input: &str, root_index: bool) -> Index {
+pub(crate) fn parse(input: &str, root_index: bool) -> Index {
     let document = Document::parse(input).expect("fixture is within parser limits");
     let status = document
         .elements()
@@ -134,87 +134,6 @@ pub(crate) fn astral(input: &str, root_index: bool) -> Index {
                     })
                 },
                 text: root_index.then(|| anchor.text().trim().to_owned()),
-            })
-        })
-        .collect();
-    Index {
-        base,
-        status,
-        links,
-    }
-}
-
-/// Perform the same reads through astral-tl 0.8.0, as used by uv.
-pub(crate) fn baseline(input: &str, root_index: bool) -> Index {
-    let dom = tl::parse(input, tl::ParserOptions::default()).expect("valid fixture size");
-    let status = dom
-        .nodes()
-        .iter()
-        .find(|node| {
-            node.as_tag()
-                .is_some_and(|tag| tag.name().as_bytes().eq_ignore_ascii_case(b"head"))
-        })
-        .and_then(|head| head.children())
-        .map(|children| {
-            children
-                .all(dom.parser())
-                .iter()
-                .filter_map(tl::Node::as_tag)
-                .filter(|tag| tag.name().as_bytes().eq_ignore_ascii_case(b"meta"))
-                .filter_map(|meta| {
-                    let name = meta.attributes().get("name")??.as_utf8_str();
-                    matches!(
-                        name.as_ref(),
-                        "pypi:project-status" | "pypi:project-status-reason"
-                    )
-                    .then(|| {
-                        (
-                            name.into_owned(),
-                            meta.attributes()
-                                .get("content")
-                                .flatten()
-                                .map(|value| value.as_utf8_str().into_owned()),
-                        )
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let base = dom
-        .nodes()
-        .iter()
-        .filter_map(tl::Node::as_tag)
-        .take_while(|tag| {
-            !tag.name().as_bytes().eq_ignore_ascii_case(b"a")
-                && !tag.name().as_bytes().eq_ignore_ascii_case(b"link")
-        })
-        .find(|tag| tag.name().as_bytes().eq_ignore_ascii_case(b"base"))
-        .and_then(|tag| tag.attributes().get("href").flatten())
-        .map(|value| value.as_utf8_str().into_owned());
-    let links = dom
-        .nodes()
-        .iter()
-        .filter_map(tl::Node::as_tag)
-        .filter(|tag| tag.name().as_bytes().eq_ignore_ascii_case(b"a"))
-        .filter_map(|anchor| {
-            let href = anchor.attributes().get("href")??.as_utf8_str();
-            if href.is_empty() {
-                return None;
-            }
-            Some(Link {
-                href: html_escape::decode_html_entities(&href).into_owned(),
-                attributes: if root_index {
-                    std::array::from_fn(|_| None)
-                } else {
-                    ATTRIBUTES.map(|name| {
-                        anchor.attributes().get(name).map(|value| {
-                            value.map(|value| {
-                                html_escape::decode_html_entities(&value.as_utf8_str()).into_owned()
-                            })
-                        })
-                    })
-                },
-                text: root_index.then(|| anchor.inner_text(dom.parser()).trim().to_owned()),
             })
         })
         .collect();
