@@ -4,12 +4,17 @@
 
 A high-performance HTML parser designed for document traversal.
 
+> [!WARNING]
+>
+> This README was written by a human, but all code changes, PR summaries, and
+> additional documentation were authored entirely by GPT-6 Astra in Codex.
+
 ## Benchmarks
 
 ### Link extraction
 
 Parse HTML, collect owned `href`, `title`, and `rel` attributes from links, and
-drop the output. astral-html uses `Reader`.
+drop the output (`astral_html::Reader`).
 
 | Parser | iniconfig | Bootstrap dashboard | Rust Book | PEP 8 | PEP index |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -19,13 +24,13 @@ drop the output. astral-html uses `Reader`.
 | lol_html | 17.08 | 65.32 | 284.96 | 527.90 | 2,857.74 |
 | scraper | 66.81 | 399.16 | 1,589.29 | 3,193.92 | 11,346.75 |
 
-<sub>Times in microseconds (µs); lower is better. Median of three session means with warm input and the system allocator on a shared AMD EPYC-Milan VM. [Methodology and raw results](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
+<sub>Times in microseconds (µs); [lower is better](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
 
 ### Document construction
 
-Parse HTML into each library's native document and drop it. astral-html uses
-`Document`. The representations differ: astral-html retains lexical scopes,
-while scraper performs HTML tree construction.
+Parse HTML into each library's native document and drop it (`astral_html::Document`).
+The representations differ: astral-html retains lexical scopes, while scraper
+performs HTML tree construction.
 
 | Parser | iniconfig | Bootstrap dashboard | Rust Book | PEP 8 | PEP index |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -33,12 +38,7 @@ while scraper performs HTML tree construction.
 | tl | 8.23 | 48.86 | 192.51 | 394.16 | 1,124.35 |
 | scraper | 63.11 | 378.35 | 1,570.03 | 3,090.82 | 9,958.86 |
 
-<sub>Times in microseconds (µs); lower is better. Median of three session means with warm input and the system allocator on a shared AMD EPYC-Milan VM. [Methodology and raw results](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
-
-> [!WARNING]
->
-> This README was written by a human, but all code changes, PR summaries, and
-> additional documentation were authored entirely by GPT-6 Astra in Codex.
+<sub>Times in microseconds (µs); [lower is better](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
 
 ## Example usage
 
