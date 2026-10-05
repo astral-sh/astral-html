@@ -147,6 +147,29 @@ fn preserves_first_attributes_across_deduplication_threshold() {
 }
 
 #[test]
+fn attribute_deduplication_is_scoped_to_each_tag() {
+    let tags: Vec<_> = [17, 64, 1, 0, 16, 17, 1024, 17]
+        .into_iter()
+        .enumerate()
+        .map(|(tag, count)| {
+            let mut source = String::from("<a");
+            for attribute in 0..count {
+                source.push_str(&format!(" ATTR{attribute}={tag} attr{attribute}=ignored"));
+            }
+            source.push('>');
+            source
+        })
+        .collect();
+    let source = tags.concat();
+    assert_eq!(
+        Tokenizer::new(&source).collect::<Vec<_>>(),
+        tags.iter()
+            .flat_map(|tag| Tokenizer::new(tag))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn positions_are_utf8_boundaries_and_exhaustion_is_permanent() {
     for source in [
         "",
