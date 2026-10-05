@@ -903,9 +903,13 @@ fn is_space(byte: u8) -> bool {
     matches!(byte, b'\t' | b'\n' | b'\x0c' | b'\r' | b' ')
 }
 
-/// Compare a normalized name by folding ASCII case only in the candidate.
+/// Compare a normalized name without ASCII case sensitivity.
 #[inline]
 pub(crate) fn matches_normalized_name(name: &[u8], candidate: &[u8]) -> bool {
+    // The standard comparison processes long names in vector-sized chunks.
+    if name.len() >= 16 {
+        return name.eq_ignore_ascii_case(candidate);
+    }
     name.len() == candidate.len()
         && name
             .iter()

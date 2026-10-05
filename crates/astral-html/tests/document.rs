@@ -234,3 +234,19 @@ fn name_queries_fold_ascii_letters_only() {
     assert!(element.attribute("DATA-É").is_none());
     assert!(element.attribute("data-{").is_none());
 }
+
+#[test]
+fn name_queries_match_across_comparison_lengths() {
+    for len in [15, 16, 17, 128] {
+        let name = "a".repeat(len);
+        let input = format!("<{name} {name}=value></{name}>");
+        let document = Document::parse(&input).unwrap();
+        let element = document.elements().next().unwrap();
+        let query = name.to_ascii_uppercase();
+        assert!(element.is(&query));
+        assert_eq!(element.attribute(&query).unwrap().value(), "value");
+        let query = format!("{}B", "A".repeat(len - 1));
+        assert!(!element.is(&query));
+        assert!(element.attribute(&query).is_none());
+    }
+}
