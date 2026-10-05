@@ -1,0 +1,2 @@
+# Preserve the upstream html5lib documentation verbatim.
+crates/astral-html/tests/fixtures/html5lib/tokenizer/README.md
