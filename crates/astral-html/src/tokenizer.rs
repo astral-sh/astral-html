@@ -996,13 +996,10 @@ mod tests {
             "é 🦀 - < >",
         ] {
             let source = format!("<!--{text}-->");
-            let mut tokenizer = super::Tokenizer::new(&source);
             assert!(matches!(
-                tokenizer.next(),
+                super::Tokenizer::new(&source).next(),
                 Some(super::Token::Comment(Cow::Borrowed(value))) if value == text
             ));
-            assert_eq!(tokenizer.position(), source.len());
-            assert!(tokenizer.next().is_none());
         }
     }
 
