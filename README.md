@@ -4,11 +4,6 @@
 
 A high-performance HTML parser designed for document traversal.
 
-> [!WARNING]
->
-> This README was written by a human, but all code changes, PR summaries, and
-> additional documentation were authored entirely by GPT-6 Astra in Codex.
-
 <p align="center">
   <picture align="center">
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/extraction-dark.svg">
@@ -20,6 +15,11 @@ A high-performance HTML parser designed for document traversal.
 <p align="center">
   <i>Extracting 2,000 anchor links from a Simple API-compatible index</i>
 </p>
+
+> [!WARNING]
+>
+> This README was written by a human, but all code changes, PR summaries, and
+> additional documentation were authored entirely by GPT-6 Astra in Codex.
 
 ## Example usage
 
