@@ -15,19 +15,13 @@ concurrency:
 
 jobs:
   codspeed:
-    name: CodSpeed (${{ matrix.suite }})
+    name: CodSpeed
     if: github.repository == 'astral-sh/astral-html'
     runs-on: github-ubuntu-24.04-x86_64-4
     timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [default, uv, scanning, entity-scanning]
-    env:
-      ASTRAL_HTML_BENCH_SUITE: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

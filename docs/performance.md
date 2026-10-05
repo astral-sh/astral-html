@@ -8,24 +8,19 @@ package validation, network requests, and resolution are excluded.
 
 ```console
 cargo bench -p astral-html --bench parse --locked
-cargo bench -p astral-html --bench parse --locked --features benchmark-jemalloc
-ASTRAL_HTML_BENCH_SUITE=uv cargo bench -p astral-html --bench parse --locked --features benchmark-jemalloc
 ```
 
-The default suite includes captured and generated package indexes, many
-attributes, long text, and entities. The `uv` suite covers all 32 pinned HTML
-fixtures. The `scanning` suite covers names, comments, scripts, and repeated
-small text-mode elements. The `entity-scanning` suite covers uncommon and
-unknown references and long text prefixes. The jemalloc feature requires Linux
-on x86_64 or aarch64. Otherwise, run without the feature to use the system
-allocator.
+Both benchmark targets run all 58 cases by default using the system allocator.
+The inputs include captured and generated package indexes, all 32 pinned uv HTML
+fixtures, many attributes, long text, entities, names, comments, scripts, and
+repeated small text-mode elements. Entity cases cover uncommon and unknown
+references and long text prefixes.
 
-| Variable                      | Default   | Purpose                                                          |
-| ----------------------------- | --------- | ---------------------------------------------------------------- |
-| `ASTRAL_HTML_BENCH_SUITE`     | `default` | Select `default`, `uv`, `scanning`, or `entity-scanning` inputs. |
-| `ASTRAL_HTML_BENCH_CASE`      | All cases | Filter case names by substring.                                  |
-| `ASTRAL_HTML_BENCH_SAMPLES`   | `21`      | Samples per case; at least 3.                                    |
-| `ASTRAL_HTML_BENCH_SAMPLE_MS` | `100`     | Warmup duration in milliseconds.                                 |
+| Variable                      | Default   | Purpose                          |
+| ----------------------------- | --------- | -------------------------------- |
+| `ASTRAL_HTML_BENCH_CASE`      | All cases | Filter case names by substring.  |
+| `ASTRAL_HTML_BENCH_SAMPLES`   | `21`      | Samples per case; at least 3.    |
+| `ASTRAL_HTML_BENCH_SAMPLE_MS` | `100`     | Warmup duration in milliseconds. |
 
 Warmup chooses an iteration count for each case. CSV output contains median,
 10th percentile, and 90th percentile runtimes and throughput; the percentiles
@@ -45,7 +40,7 @@ does not measure uv-client end to end.
 
 The [benchmark workflow](../.github/workflows/benchmarks.yml) follows
 [Ruff's CodSpeed setup](https://github.com/astral-sh/ruff/blob/ca53cef36054b5a9322e6897fe860e8ed5e00c1d/.github/workflows/ci.yaml).
-It runs all four suites on pull requests, pushes to `main`, and manual
+It runs all cases in one job on pull requests, pushes to `main`, and manual
 dispatches, recording CPU simulation and memory measurements. The
 `parse_codspeed` target shares inputs with `parse` and includes parsing, field
 extraction, and output destruction in each measurement. Input construction
@@ -65,9 +60,9 @@ cargo codspeed run
 ```
 
 `cargo codspeed run` validates the instrumented benchmarks locally; collection
-and upload happen inside the CodSpeed action in CI. `ASTRAL_HTML_BENCH_SUITE`
-and `ASTRAL_HTML_BENCH_CASE` select inputs for both targets. The custom sampling
-and profiling variables apply only to `parse`. For local Criterion timings:
+and upload happen inside the CodSpeed action in CI. `ASTRAL_HTML_BENCH_CASE`
+filters inputs for both targets. The custom sampling and profiling variables
+apply only to `parse`. For local Criterion timings:
 
 ```console
 cargo bench -p astral-html --bench parse_codspeed --locked

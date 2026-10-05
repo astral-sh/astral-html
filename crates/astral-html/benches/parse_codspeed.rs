@@ -9,10 +9,6 @@ use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
-#[cfg(feature = "benchmark-jemalloc")]
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
 fn parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse-and-extract");
     for case in cases::cases() {

@@ -7,66 +7,63 @@ pub(crate) struct Case {
 }
 
 pub(crate) fn cases() -> Vec<Case> {
-    let mut cases: Vec<Case> = match std::env::var("ASTRAL_HTML_BENCH_SUITE").as_deref() {
-        Ok("uv") => crate::support::uv_fixtures()
-            .map(|(name, input, root_index)| Case {
-                name,
-                input: input.to_owned(),
-                root_index,
-            })
-            .collect(),
-        Ok("scanning") => scanning_cases(),
-        Ok("entity-scanning") => entity_scanning_cases(),
-        Err(std::env::VarError::NotPresent) | Ok("default") => vec![
-            Case {
-                name: "iniconfig-captured",
-                input: include_str!("../fixtures/iniconfig.html").to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "codeartifact-uv",
-                input: include_str!("../../tests/fixtures/uv/parse_code_artifact_index_html.html")
-                    .to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "flat-index-uv",
-                input: include_str!("../../tests/fixtures/uv/parse_flat_index_html.html").to_owned(),
-                root_index: false,
-            },
-            Case {
-                name: "project-1000-generated",
-                input: project_index(1_000),
-                root_index: false,
-            },
-            Case {
-                name: "project-10000-generated",
-                input: project_index(10_000),
-                root_index: false,
-            },
-            Case {
-                name: "root-10000-generated",
-                input: root_index(10_000),
-                root_index: true,
-            },
-            Case {
-                name: "attributes-64-generated",
-                input: attribute_index(100, 64),
-                root_index: false,
-            },
-            Case {
-                name: "text-1m-generated",
-                input: format!("<html><body>{}<a href=/demo.whl>demo</a></body></html>", "x".repeat(1_048_576)),
-                root_index: false,
-            },
-            Case {
-                name: "entities-1000-generated",
-                input: format!("<html><body>{}</body></html>", r#"<a href="/demo.whl?x=&amp;&quot;&gt;&#65;&#x1F980;" data-requires-python="&gt;=3.9" data-yanked="broken &amp; withdrawn">demo</a>"#.repeat(1_000)),
-                root_index: false,
-            },
-        ],
-        _ => panic!("ASTRAL_HTML_BENCH_SUITE must be default, uv, scanning, or entity-scanning"),
-    };
+    let mut cases = vec![
+        Case {
+            name: "iniconfig-captured",
+            input: include_str!("../fixtures/iniconfig.html").to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "codeartifact-uv",
+            input: include_str!("../../tests/fixtures/uv/parse_code_artifact_index_html.html")
+                .to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "flat-index-uv",
+            input: include_str!("../../tests/fixtures/uv/parse_flat_index_html.html").to_owned(),
+            root_index: false,
+        },
+        Case {
+            name: "project-1000-generated",
+            input: project_index(1_000),
+            root_index: false,
+        },
+        Case {
+            name: "project-10000-generated",
+            input: project_index(10_000),
+            root_index: false,
+        },
+        Case {
+            name: "root-10000-generated",
+            input: root_index(10_000),
+            root_index: true,
+        },
+        Case {
+            name: "attributes-64-generated",
+            input: attribute_index(100, 64),
+            root_index: false,
+        },
+        Case {
+            name: "text-1m-generated",
+            input: format!("<html><body>{}<a href=/demo.whl>demo</a></body></html>", "x".repeat(1_048_576)),
+            root_index: false,
+        },
+        Case {
+            name: "entities-1000-generated",
+            input: format!("<html><body>{}</body></html>", r#"<a href="/demo.whl?x=&amp;&quot;&gt;&#65;&#x1F980;" data-requires-python="&gt;=3.9" data-yanked="broken &amp; withdrawn">demo</a>"#.repeat(1_000)),
+            root_index: false,
+        },
+    ];
+    cases.extend(
+        crate::support::uv_fixtures().map(|(name, input, root_index)| Case {
+            name,
+            input: input.to_owned(),
+            root_index,
+        }),
+    );
+    cases.extend(scanning_cases());
+    cases.extend(entity_scanning_cases());
 
     if let Ok(filter) = std::env::var("ASTRAL_HTML_BENCH_CASE") {
         cases.retain(|case| case.name.contains(&filter));

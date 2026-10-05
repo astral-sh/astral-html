@@ -9,10 +9,6 @@ use cases::Case;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "benchmark-jemalloc")]
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
 fn main() {
     // Cargo adds `--bench` for benchmarks, but runs this binary without it for
     // `cargo test --all-targets` when the libtest harness is disabled.
@@ -27,11 +23,6 @@ fn main() {
         return;
     }
 
-    let allocator = if cfg!(feature = "benchmark-jemalloc") {
-        "jemalloc"
-    } else {
-        "system"
-    };
     if let Ok(profile) = std::env::var("ASTRAL_HTML_BENCH_PROFILE") {
         assert_eq!(profile, "1", "ASTRAL_HTML_BENCH_PROFILE must be 1");
         assert_eq!(
@@ -50,7 +41,7 @@ fn main() {
         assert!(iterations > 0, "profile iterations must be positive");
         let elapsed = measure(&cases[0], iterations);
         println!(
-            "# profile allocator={allocator} case={} iterations={iterations} mean_ns={elapsed:.0}",
+            "# profile case={} iterations={iterations} mean_ns={elapsed:.0}",
             cases[0].name
         );
         return;
@@ -68,7 +59,7 @@ fn main() {
     let target = Duration::from_millis(sample_ms);
 
     println!("# astral-html parse and uv field extraction");
-    println!("# allocator={allocator} samples={samples} warmup_ms={sample_ms}");
+    println!("# samples={samples} warmup_ms={sample_ms}");
     println!(
         "case,bytes,links,astral_html_ns,astral_html_mib_s,astral_html_p10_ns,astral_html_p90_ns"
     );
