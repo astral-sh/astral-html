@@ -6,7 +6,7 @@ use std::iter::FusedIterator;
 
 use memchr::{memchr, memchr_iter, memchr2, memchr3};
 
-use crate::entities::{decode, normalize};
+use crate::entities::{decode, decode_from, normalize};
 
 /// A tokenizer state selected by the caller or a tree builder.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
@@ -108,7 +108,7 @@ pub struct Tokenizer<'a> {
     source: &'a str,
     position: usize,
     state: State,
-    last_start_tag: Option<String>,
+    last_start_tag: Option<Cow<'static, str>>,
     // Only large tags need an index; keep its allocation for subsequent tags.
     attribute_names: Option<HashSet<Cow<'a, str>>>,
 }
@@ -132,7 +132,7 @@ impl<'a> Tokenizer<'a> {
             state,
             last_start_tag: last_start_tag
                 .filter(|name| can_end_text(name))
-                .map(str::to_ascii_lowercase),
+                .map(|name| Cow::Owned(name.to_ascii_lowercase())),
             attribute_names: None,
         }
     }
@@ -142,7 +142,13 @@ impl<'a> Tokenizer<'a> {
         self.state = state;
         self.last_start_tag = last_start_tag
             .filter(|name| can_end_text(name))
-            .map(str::to_ascii_lowercase);
+            .map(|name| Cow::Owned(name.to_ascii_lowercase()));
+    }
+
+    /// Select a text mode using one of the reader's lowercase static tag names.
+    pub(crate) fn set_static_text_state(&mut self, state: State, name: &'static str) {
+        self.state = state;
+        self.last_start_tag = Some(Cow::Borrowed(name));
     }
 
     /// Return the byte offset of the next unread source character.
@@ -806,9 +812,10 @@ impl<'a> Tokenizer<'a> {
                 }
                 self.position = memchr(b'<', &rest[first..])
                     .map_or(self.source.len(), |offset| start + first + offset);
-                return Some(Token::Text(decode(
+                return Some(Token::Text(decode_from(
                     &self.source[start..self.position],
                     false,
+                    first,
                 )));
             }
             let rest = &self.source.as_bytes()[start..];
