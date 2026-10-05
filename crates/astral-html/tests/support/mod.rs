@@ -95,7 +95,9 @@ pub(crate) fn astral(input: &str, root_index: bool) -> Index {
                         || {
                             (
                                 name.to_owned(),
-                                meta.attribute("content").map(|attr| attr.value.to_string()),
+                                meta.attribute("content")
+                                    .filter(|attr| attr.raw_value.is_some())
+                                    .map(|attr| attr.value.to_string()),
                             )
                         },
                     )
@@ -107,7 +109,11 @@ pub(crate) fn astral(input: &str, root_index: bool) -> Index {
         .elements()
         .take_while(|element| !element.is("a") && !element.is("link"))
         .find(|element| element.is("base"))
-        .and_then(|base| base.attribute("href").map(|attr| attr.value.to_string()));
+        .and_then(|base| {
+            base.attribute("href")
+                .filter(|attr| attr.raw_value.is_some())
+                .map(|attr| attr.value.to_string())
+        });
     let links = document
         .elements()
         .filter(|element| element.is("a"))
