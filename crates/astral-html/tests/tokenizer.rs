@@ -105,17 +105,66 @@ fn borrows_ordinary_source_fields() {
 }
 
 #[test]
-fn comment_newlines_preserve_recovery_and_source_positions() {
-    for newline in ["\r", "\r\n", "\n"] {
+fn borrows_comments_through_state_transitions() {
+    for (comment, expected) in [
+        ("<!--a-b<c>d\né🦀-->", "a-b<c>d\né🦀"),
+        ("<!---x-->", "-x"),
+        ("<!--a--x-->", "a--x"),
+        ("<!--a--!x-->", "a--!x"),
+        ("<!--a--!-x-->", "a--!-x"),
+        ("<!--a<!--b-->", "a<!--b"),
+        ("<!--a<!-b-->", "a<!-b"),
+        ("<!--a<<!x-->", "a<<!x"),
+        ("<!--a--!>", "a"),
+        ("<!--a---->", "a--"),
+        ("<!-->", ""),
+        ("<!--->", ""),
+        ("<!--", ""),
+        ("<!---", ""),
+        ("<!--a>b", "a>b"),
+        ("<!--a-", "a"),
+        ("<!--a--", "a"),
+        ("<!--a--!", "a"),
+        ("<!--a--!-", "a--!"),
+        ("<!--a<", "a<"),
+        ("<!--a<!", "a<!"),
+        ("<!--a<!-", "a<!"),
+        ("<!--a<!--", "a<!"),
+    ] {
+        let tail = if comment.ends_with('>') { "tail" } else { "" };
+        let source = format!("{comment}{tail}");
+        let mut tokenizer = Tokenizer::new(&source);
+        let Some(Token::Comment(Cow::Borrowed(text))) = tokenizer.next() else {
+            panic!("expected borrowed comment for {source:?}");
+        };
+        assert_eq!(text, expected, "{source:?}");
+        assert_eq!(text.as_ptr(), source[4..].as_ptr(), "{source:?}");
+        assert_eq!(tokenizer.position(), comment.len(), "{source:?}");
+        if !tail.is_empty() {
+            assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed(tail))));
+        }
+        assert_eq!(tokenizer.next(), None);
+    }
+}
+
+#[test]
+fn comment_normalization_preserves_recovery_and_source_positions() {
+    for (input, normalized) in [
+        ("\r", "\n"),
+        ("\r\n", "\n"),
+        ("\0", "�"),
+        ("\r\0", "\n�"),
+        ("\r\n\0", "\n�"),
+        ("\n\0", "\n�"),
+    ] {
         for prefix in ["", "-", "x", "<", "<!", "<!-", "<!--", "x-", "--", "--!"] {
-            let comment = format!("<!--{prefix}{newline}\0-->");
+            let comment = format!("<!--{prefix}{input}-->");
             let source = format!("{comment}<p>after");
             let mut tokenizer = Tokenizer::new(&source);
-            assert_eq!(
-                tokenizer.next(),
-                Some(Token::Comment(Cow::Owned(format!("{prefix}\n�")))),
-                "{source:?}"
-            );
+            let Some(Token::Comment(Cow::Owned(text))) = tokenizer.next() else {
+                panic!("expected normalized comment for {source:?}");
+            };
+            assert_eq!(text, format!("{prefix}{normalized}"), "{source:?}");
             assert_eq!(tokenizer.position(), comment.len());
             assert!(matches!(tokenizer.next(), Some(Token::StartTag(tag)) if tag.name == "p"));
             assert_eq!(tokenizer.next(), Some(Token::Text(Cow::Borrowed("after"))));
@@ -261,10 +310,11 @@ fn long_comments_preserve_text_around_state_transitions() {
         (">x", ">x"),
     ] {
         let source = format!("<!--{run}{suffix}-->");
-        assert_eq!(
-            Tokenizer::new(&source).next(),
-            Some(Token::Comment(Cow::Owned(format!("{run}{normalized}"))))
-        );
+        let Some(Token::Comment(text)) = Tokenizer::new(&source).next() else {
+            panic!("expected comment");
+        };
+        assert_eq!(text, format!("{run}{normalized}"));
+        assert_eq!(matches!(text, Cow::Borrowed(_)), suffix == normalized);
     }
     let text = format!("{run}\r\n-{run}<x\0{run}\r{run}");
     let expected = format!("{run}\n-{run}<x�{run}\n{run}");

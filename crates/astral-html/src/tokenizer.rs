@@ -369,19 +369,15 @@ impl<'a> Tokenizer<'a> {
             EndBang,
         }
         let mut state = CommentState::Start;
-        let mut data = String::new();
-        while let Some(mut ch) = self.source[self.position..].chars().next() {
-            let mut width = ch.len_utf8();
-            // Normalize while scanning to avoid copying the entire comment afterward.
-            if ch == '\r' {
-                ch = '\n';
-                width += usize::from(self.source.as_bytes().get(self.position + 1) == Some(&b'\n'));
-            }
+        let start = self.position;
+        // Emitted content is a contiguous prefix; keep pending delimiters outside it.
+        let mut end = start;
+        while let Some(ch) = self.current() {
             let mut consume = true;
             match state {
                 CommentState::Start => match ch {
-                    '-' => state = CommentState::StartDash,
-                    '>' => {
+                    b'-' => state = CommentState::StartDash,
+                    b'>' => {
                         self.position += 1;
                         break;
                     }
@@ -391,52 +387,43 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
                 CommentState::StartDash => match ch {
-                    '-' => state = CommentState::End,
-                    '>' => {
+                    b'-' => state = CommentState::End,
+                    b'>' => {
                         self.position += 1;
                         break;
                     }
                     _ => {
-                        data.push('-');
+                        end = self.position;
                         state = CommentState::Data;
                         consume = false;
                     }
                 },
                 CommentState::Data => match ch {
-                    '<' => {
-                        data.push('<');
+                    b'<' => {
+                        end = self.position + 1;
                         state = CommentState::Less;
                     }
-                    '-' => state = CommentState::EndDash,
-                    '\0' => data.push('\u{fffd}'),
-                    '\n' => data.push('\n'),
+                    b'-' => state = CommentState::EndDash,
                     _ => {
-                        let rest = &self.source[self.position..];
-                        let end = memchr3(b'<', b'-', b'\r', rest.as_bytes()).unwrap_or(rest.len());
-                        let mut start = 0;
-                        for nul in memchr_iter(0, &rest.as_bytes()[..end]) {
-                            data.push_str(&rest[start..nul]);
-                            data.push('\u{fffd}');
-                            start = nul + 1;
-                        }
-                        data.push_str(&rest[start..end]);
-                        self.position += end;
+                        let rest = &self.source.as_bytes()[self.position..];
+                        self.position += memchr2(b'<', b'-', rest).unwrap_or(rest.len());
+                        end = self.position;
                         continue;
                     }
                 },
                 CommentState::Less => match ch {
-                    '!' => {
-                        data.push('!');
+                    b'!' => {
+                        end = self.position + 1;
                         state = CommentState::Bang;
                     }
-                    '<' => data.push('<'),
+                    b'<' => end = self.position + 1,
                     _ => {
                         state = CommentState::Data;
                         consume = false;
                     }
                 },
                 CommentState::Bang => {
-                    if ch == '-' {
+                    if ch == b'-' {
                         state = CommentState::BangDash;
                     } else {
                         state = CommentState::Data;
@@ -444,7 +431,7 @@ impl<'a> Tokenizer<'a> {
                     }
                 }
                 CommentState::BangDash => {
-                    if ch == '-' {
+                    if ch == b'-' {
                         state = CommentState::BangDashDash;
                     } else {
                         state = CommentState::EndDash;
@@ -456,48 +443,48 @@ impl<'a> Tokenizer<'a> {
                     consume = false;
                 }
                 CommentState::EndDash => {
-                    if ch == '-' {
+                    if ch == b'-' {
                         state = CommentState::End;
                     } else {
-                        data.push('-');
+                        end = self.position;
                         state = CommentState::Data;
                         consume = false;
                     }
                 }
                 CommentState::End => match ch {
-                    '>' => {
+                    b'>' => {
                         self.position += 1;
                         break;
                     }
-                    '!' => state = CommentState::EndBang,
-                    '-' => data.push('-'),
+                    b'!' => state = CommentState::EndBang,
+                    b'-' => end = self.position - 1,
                     _ => {
-                        data.push_str("--");
+                        end = self.position;
                         state = CommentState::Data;
                         consume = false;
                     }
                 },
                 CommentState::EndBang => match ch {
-                    '-' => {
-                        data.push_str("--!");
+                    b'-' => {
+                        end = self.position;
                         state = CommentState::EndDash;
                     }
-                    '>' => {
+                    b'>' => {
                         self.position += 1;
                         break;
                     }
                     _ => {
-                        data.push_str("--!");
+                        end = self.position;
                         state = CommentState::Data;
                         consume = false;
                     }
                 },
             }
             if consume {
-                self.position += width;
+                self.position += 1;
             }
         }
-        Token::Comment(Cow::Owned(data))
+        Token::Comment(normalize_text(&self.source[start..end]))
     }
 
     /// Read a quoted doctype identifier up to its quote, `>`, or EOF.
