@@ -13,7 +13,7 @@ A high-performance HTML parser designed for document traversal.
 
 - A single runtime dependency: `memchr`.
 - No unsafe code, beyond `memchr`.
-- Passes 7,045 [html5lib tokenizer conformance tests](docs/conformance.md).
+- Passes 7,045 html5lib tokenizer conformance tests.
 
 ## Benchmarks
 
