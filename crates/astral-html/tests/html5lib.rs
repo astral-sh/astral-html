@@ -1,11 +1,13 @@
-//! Token-output conformance against the pinned html5lib tokenizer suite.
+//! Token-output conformance against pinned html5lib and html5ever tokenizer suites.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use astral_html::{State, Token, Tokenizer};
+use astral_html::{State, Tokenizer};
 use serde_json::{Value, json};
+
+#[path = "support/tokens.rs"]
+mod tokens;
 
 /// Decode the additional escapes used by html5lib's non-scalar test cases.
 fn unescape(input: &str) -> Option<String> {
@@ -43,58 +45,18 @@ fn unescape_value(value: &mut Value) -> Option<()> {
     Some(())
 }
 
-/// Convert tokens to the fixture representation, coalescing adjacent text.
-fn output(source: &str, state: State, last_start_tag: Option<&str>) -> Value {
-    let mut result = Vec::<Value>::new();
-    for token in Tokenizer::with_state(source, state, last_start_tag) {
-        let value = match token {
-            Token::Text(text) => {
-                if text.is_empty() {
-                    continue;
-                }
-                if let Some(last) = result.last_mut().filter(|last| last[0] == "Character") {
-                    let mut merged = last[1].as_str().unwrap().to_owned();
-                    merged.push_str(&text);
-                    last[1] = Value::String(merged);
-                    continue;
-                }
-                json!(["Character", text])
-            }
-            Token::StartTag(tag) => {
-                let count = tag.attributes.len();
-                let attributes: BTreeMap<_, _> = tag
-                    .attributes
-                    .into_iter()
-                    .map(|attribute| (attribute.name.into_owned(), attribute.value.into_owned()))
-                    .collect();
-                assert_eq!(attributes.len(), count, "duplicate attribute names");
-                if tag.self_closing {
-                    json!(["StartTag", tag.name, attributes, true])
-                } else {
-                    json!(["StartTag", tag.name, attributes])
-                }
-            }
-            Token::EndTag(tag) => json!(["EndTag", tag.name]),
-            Token::Comment(comment) => json!(["Comment", comment]),
-            Token::Doctype(doctype) => json!([
-                "DOCTYPE",
-                doctype.name,
-                doctype.public_id,
-                doctype.system_id,
-                !doctype.force_quirks
-            ]),
-            Token::ProcessingInstruction { target, data } => {
-                json!(["ProcessingInstruction", target, data])
-            }
-        };
-        result.push(value);
-    }
-    Value::Array(result)
-}
-
-#[test]
-fn html5lib_tokenizer() {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/html5lib/tokenizer");
+/// Run an upstream suite without weakening its exact coverage or exclusion counts.
+fn run_suite(
+    suite: &str,
+    expected_files: usize,
+    expected_runs: usize,
+    expected_excluded_surrogates: usize,
+    expected_excluded_xml: usize,
+) {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(suite)
+        .join("tokenizer");
     let mut paths: Vec<_> = fs::read_dir(directory)
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -104,7 +66,11 @@ fn html5lib_tokenizer() {
         })
         .collect();
     paths.sort();
-    assert_eq!(paths.len(), 14, "the pinned suite must be present in full");
+    assert_eq!(
+        paths.len(),
+        expected_files,
+        "the pinned {suite} suite must be present in full"
+    );
     let mut runs = 0;
     let mut excluded_surrogates = 0;
     let mut excluded_xml = 0;
@@ -145,7 +111,11 @@ fn html5lib_tokenizer() {
                     state => panic!("unknown state: {state}"),
                 };
                 runs += 1;
-                let actual = output(&source, state, test["lastStartTag"].as_str());
+                let actual = Value::Array(tokens::output(Tokenizer::with_state(
+                    &source,
+                    state,
+                    test["lastStartTag"].as_str(),
+                )));
                 if actual != expected {
                     failures.push(format!("{}:{index} {state:?}: {}\ninput: {source:?}\nexpected: {expected}\nactual:   {actual}", path.file_name().unwrap().to_string_lossy(), test["description"]));
                 }
@@ -153,15 +123,25 @@ fn html5lib_tokenizer() {
         }
     }
     eprintln!(
-        "html5lib: {runs} runs, {excluded_surrogates} non-scalar inputs excluded, {excluded_xml} XML-coercion cases excluded"
+        "{suite}: {runs} runs, {excluded_surrogates} non-scalar inputs excluded, {excluded_xml} XML-coercion cases excluded"
     );
     assert!(
         failures.is_empty(),
-        "{} failures:\n{}",
+        "{suite}: {} failures:\n{}",
         failures.len(),
         failures[..failures.len().min(40)].join("\n\n")
     );
-    assert_eq!(runs, 7045, "unexpected tokenizer coverage");
-    assert_eq!(excluded_surrogates, 4);
-    assert_eq!(excluded_xml, 4);
+    assert_eq!(runs, expected_runs, "unexpected {suite} tokenizer coverage");
+    assert_eq!(excluded_surrogates, expected_excluded_surrogates);
+    assert_eq!(excluded_xml, expected_excluded_xml);
+}
+
+#[test]
+fn html5lib_tokenizer() {
+    run_suite("html5lib", 14, 7045, 4, 4);
+}
+
+#[test]
+fn html5ever_tokenizer() {
+    run_suite("html5ever", 2, 20, 0, 0);
 }
