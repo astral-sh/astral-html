@@ -12,6 +12,7 @@ description = "A high-performance HTML parser designed for document traversal."
 memchr.workspace = true
 
 [dev-dependencies]
+html5gum = { version = "=0.8.4", default-features = false }
 insta = { version = "1.48.0", default-features = false }
 serde_json.workspace = true
 criterion.workspace = true

@@ -29,6 +29,39 @@ references, script escaping and double escaping, and processing instructions.
 The independent fuzz oracle predates processing instructions; its narrower
 comparison is documented in [fuzzing.md](fuzzing.md).
 
+## Additional upstream coverage
+
+The pinned
+[html5ever regression fixtures](../crates/astral-html/tests/fixtures/html5ever/README.md)
+add **14 cases / 20 state-expanded runs** to the same token-output harness, with
+no exclusions. These are html5ever's custom tests, separate from its vendored
+html5lib suite.
+
+[Selected Web Platform Tests](../crates/astral-html/tests/fixtures/wpt/README.md)
+add **2,252 tokenizer input cases**: all 2,231 named character references, plus
+ambiguous ampersands in text and attributes, newline normalization, doctype
+fields, and truncated declarations. The Rust adaptations check tokenizer
+behavior; they do not run WPT's browser harness or assert browser tree
+construction. Their provenance documents each adaptation and its upstream
+source.
+
+[Nine saved parse5 pages](../crates/astral-html/tests/fixtures/parse5/README.md),
+ranging from 7,639 to 907,953 bytes, run in full through `Tokenizer`, `Reader`,
+and `Document`. Tokenizer and reader output are compared with html5gum 0.8.4;
+document element names and decoded attributes are compared with the independent
+reader's start tags. An explicit child-graph model built from those tokens also
+checks every element's parent and ordered children. Descendant order and text
+are checked for all shallow elements, selected deeper levels, and every leaf,
+covering every element on eight pages while bounding repeated subtree work on
+the largest page. The oracle uses the same HTML-only, scripting-disabled context
+as `Reader`. Every page must run, with no expected failures or truncation. The
+largest page asserts rejection at the default depth limit, then runs with an
+explicit 10,000-level limit; the other pages use the defaults. These fixtures
+provide whole-page differential coverage, not browser DOM conformance.
+
+All imported suites are pinned by revision and retain upstream licenses. They
+run offline as ordinary Cargo integration tests.
+
 ## Reader and document semantics
 
 `Tokenizer` emits tokens without selecting tree-construction insertion modes.

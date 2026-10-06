@@ -43,6 +43,7 @@ name = "astral-html"
 version = "0.0.3"
 dependencies = [
  "codspeed-criterion-compat",
+ "html5gum",
  "insta",
  "memchr",
  "serde_json",
@@ -282,6 +283,12 @@ name = "hermit-abi"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
+
+[[package]]
+name = "html5gum"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "428502d3ec1742c35e015871aef742bc4722a9acfcb616b8ff79b519922e1c36"
 
 [[package]]
 name = "insta"
