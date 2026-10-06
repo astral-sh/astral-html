@@ -1,2 +1,5 @@
 # Preserve the upstream html5lib documentation verbatim.
 crates/astral-html/tests/fixtures/html5lib/tokenizer/README.md
+
+# Preserve the upstream WPT license verbatim.
+crates/astral-html/tests/fixtures/wpt/LICENSE.md
