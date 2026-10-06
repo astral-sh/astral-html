@@ -11,10 +11,9 @@ A high-performance HTML parser designed for document traversal.
 
 ## Highlights
 
-- One runtime dependency: `memchr`.
-- No unsafe Rust in the library, enforced with `unsafe_code = "forbid"`.
-- Passes 7,045 [html5lib tokenizer conformance cases](docs/conformance.md), with
-  additional html5ever and Web Platform Tests coverage.
+- A single runtime dependency: `memchr`.
+- No unsafe code, beyond `memchr`.
+- Passes 7,045 [html5lib tokenizer conformance tests](docs/conformance.md).
 
 ## Benchmarks
 
