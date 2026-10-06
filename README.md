@@ -9,6 +9,13 @@ A high-performance HTML parser designed for document traversal.
 > This README was written by a human, but all code changes, PR summaries, and
 > additional documentation were authored entirely by GPT-6 Astra in Codex.
 
+## Highlights
+
+- One runtime dependency: `memchr`.
+- No unsafe Rust in the library, enforced with `unsafe_code = "forbid"`.
+- Passes 7,045 [html5lib tokenizer conformance cases](docs/conformance.md), with
+  additional html5ever and Web Platform Tests coverage.
+
 ## Benchmarks
 
 ### Link extraction
