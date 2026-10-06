@@ -36,9 +36,27 @@ doctypes, tag names, decoded attributes, text, and start-tag self-closing flags
 must agree. Parse-error diagnostics and raw attribute spelling are not compared.
 
 The document comparison checks all retained element names and decoded attributes
-in source order against the independent reader tokens. Reader progress, UTF-8
-positions, and permanent EOF are checked as well. These are whole-page replay
-tests, not comparisons with parse5's browser DOM or its source-location outputs.
+in source order against the independent reader tokens. A separate model applies
+our lexical scope rules to those tokens using explicit child links, rather than
+Document's flat subtree intervals. Every element's exact parent and ordered
+direct children must agree with that model.
+
+Descendant order and concatenated text are compared by walking the model's child
+graph iteratively. These queries cover every element at depths 0 through 32,
+every deeper power-of-two depth, and every element without element children.
+That covers every element on eight pages and 14,456 of the largest page's 24,558
+elements. Subtrees at a given depth are disjoint, so the selection avoids
+quadratic work on the deeply nested page. Expected text is built for one queried
+subtree at a time, without retaining copies for all its ancestors.
+
+Element views are identified by their name storage pointers, with uniqueness
+asserted before comparison. The pinned pages have distinct name storage even
+for identical tags; future fixtures or interning changes must preserve that
+assumption or update the identity check.
+
+Reader progress, UTF-8 positions, and permanent EOF are checked as well. These
+are whole-page replay tests of our lexical scopes, not comparisons with parse5's
+browser DOM or its source-location outputs.
 
 None of the pinned pages contains `<?`. The harness asserts this prerequisite
 because html5gum 0.8.4 predates processing instructions; an unsupported fixture

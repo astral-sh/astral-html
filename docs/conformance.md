@@ -47,7 +47,11 @@ Their provenance documents each adaptation and its upstream source.
 ranging from 7,639 to 907,953 bytes, run in full through `Tokenizer`, `Reader`,
 and `Document`. Tokenizer and reader output are compared with html5gum 0.8.4;
 document element names and decoded attributes are compared with the independent
-reader's start tags. The oracle uses the same HTML-only, scripting-disabled
+reader's start tags. An explicit child-graph model built from those tokens also
+checks every element's parent and ordered children. Descendant order and text
+are checked for all shallow elements, selected deeper levels, and every leaf,
+covering every element on eight pages while bounding repeated subtree work on
+the largest page. The oracle uses the same HTML-only, scripting-disabled
 context as `Reader`. Every page must run, with no expected failures or truncation.
 The largest page asserts rejection at the default depth limit, then runs with
 an explicit 10,000-level limit; the other pages use the defaults.
