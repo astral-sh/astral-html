@@ -3,6 +3,12 @@
 The parser crate forbids unsafe Rust, performs no I/O, and executes no scripts.
 It is not an HTML sanitizer. Allocator selection belongs to the application.
 
+For `<svg><style><img src=x onerror=alert(1)>`, `Reader` and `Document` return
+the `img` markup as style text; a browser can create an `img` with an `onerror`
+handler. Do not use parser output to approve HTML for rendering. Decoded
+attributes remain untrusted: callers must validate URLs and escape values for
+the output format.
+
 Tokenization and document construction are iterative. Flat node storage avoids
 recursive parsing, traversal, and destruction. Attribute deduplication and
 open-element lookup use bounded linear scans before switching to hash indexes.

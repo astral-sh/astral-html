@@ -52,6 +52,9 @@ Parse HTML into each library's native document and drop it
 Use `Document` to traverse elements and extract text and attributes, or `Reader`
 to process HTML as a stream of tokens.
 
+Do not use their output to approve HTML for rendering. See
+[safety and resource use](docs/safety.md) for details.
+
 For example, to extract links from a document:
 
 ```rust

@@ -65,6 +65,8 @@ impl std::error::Error for Error {}
 /// HTML elements is ignored. Remaining elements close at EOF. No elements are
 /// implied, relocated, or cloned: this is not the HTML browser tree-building algorithm.
 ///
+/// Text states follow [`Reader`], including inside SVG/MathML.
+///
 /// Construction, traversal, and destruction use flat storage without recursion.
 pub struct Document<'a> {
     nodes: Vec<Node<'a>>,
