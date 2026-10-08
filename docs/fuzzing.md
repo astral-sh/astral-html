@@ -35,6 +35,10 @@ ancestor, subtree, and text comparisons are limited to 128 elements. Larger
 inputs up to 16 KiB still exercise parsing and bounded traversal and text
 queries.
 
+Model comparisons leave attribute limits nonbinding because `Reader` discards
+some attributes. A separate parse with tight attribute limits must either fail
+with an attribute-limit error or produce the same elements and attributes.
+
 ## Run locally
 
 Install `cargo-fuzz` and a nightly toolchain, then run from the repository root:

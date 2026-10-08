@@ -126,6 +126,7 @@ fn enforces_limits_at_boundaries() {
         max_input_bytes: 4,
         max_nodes: 1,
         max_depth: 1,
+        ..Limits::default()
     };
     assert!(Document::parse_with_limits("<a>", limits).is_ok());
     assert!(matches!(

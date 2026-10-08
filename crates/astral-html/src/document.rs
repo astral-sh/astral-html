@@ -6,14 +6,17 @@ use std::fmt;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
-use crate::tokenizer::matches_normalized_name;
+use crate::tokenizer::{AttributeBudget, matches_normalized_name};
 use crate::{Attribute, Reader, Token};
 
 /// Resource limits for constructing a document.
 ///
 /// The input limit is checked before tokenization. Node and depth limits are
-/// checked before retaining the next node. These checks are not fallible
-/// allocation or process-wide memory accounting.
+/// checked before retaining the next node. Attribute limits are checked before
+/// reading each name or value. Both attribute limits count duplicates and
+/// attributes on end tags or unfinished tags.
+///
+/// These limits do not track allocated bytes or make allocation fallible.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     /// Maximum number of input bytes (default: 128 MiB).
@@ -22,6 +25,10 @@ pub struct Limits {
     pub max_nodes: usize,
     /// Maximum number of simultaneously open non-void elements (default: 256).
     pub max_depth: usize,
+    /// Maximum number of attributes encountered in a single tag (default: 1,024).
+    pub max_attributes_per_tag: usize,
+    /// Maximum total number of attributes encountered (default: 1 million).
+    pub max_attributes: usize,
 }
 
 impl Default for Limits {
@@ -30,6 +37,8 @@ impl Default for Limits {
             max_input_bytes: 128 * 1024 * 1024,
             max_nodes: 4_000_000,
             max_depth: 256,
+            max_attributes_per_tag: 1_024,
+            max_attributes: 1_000_000,
         }
     }
 }
@@ -43,6 +52,10 @@ pub enum Error {
     NodeLimit,
     /// The document has more simultaneously open elements than allowed.
     DepthLimit,
+    /// A tag has more attributes than allowed.
+    TagAttributeLimit,
+    /// The input has more total attributes than allowed.
+    AttributeLimit,
 }
 
 impl fmt::Display for Error {
@@ -51,6 +64,8 @@ impl fmt::Display for Error {
             Self::InputLimit => "HTML input exceeds the byte limit",
             Self::NodeLimit => "HTML document exceeds the node limit",
             Self::DepthLimit => "HTML document exceeds the nesting limit",
+            Self::TagAttributeLimit => "HTML tag exceeds the attribute limit",
+            Self::AttributeLimit => "HTML input exceeds the total attribute limit",
         })
     }
 }
@@ -121,7 +136,11 @@ impl<'a> Document<'a> {
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
         let mut reader = Reader::new(source);
         let mut attribute_buffer = Vec::new();
-        while let Some(token) = reader.next_with_attribute_buffer(&mut attribute_buffer) {
+        let mut attribute_budget =
+            AttributeBudget::new(limits.max_attributes_per_tag, limits.max_attributes);
+        while let Some(token) =
+            reader.next_with_attribute_buffer(&mut attribute_buffer, Some(&mut attribute_budget))?
+        {
             let mut attributes = match token {
                 Token::StartTag(mut tag) => {
                     let is_void = is_void(&tag.name);
