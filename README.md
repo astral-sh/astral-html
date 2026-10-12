@@ -22,13 +22,13 @@ A high-performance HTML parser designed for document traversal.
 Parse HTML, collect owned `href`, `title`, and `rel` attributes from links, and
 drop the output (`astral_html::Reader`).
 
-| Parser      | iniconfig | Bootstrap dashboard | Rust Book |    PEP 8 | PEP index |
-| ----------- | --------: | ------------------: | --------: | -------: | --------: |
-| astral-html |      5.70 |               31.20 |    146.30 |   301.01 |  1,116.75 |
-| tl          |     14.75 |               52.31 |    219.28 |   454.03 |  1,766.79 |
-| html5gum    |     14.99 |               95.35 |    394.40 |   870.56 |  2,914.33 |
-| lol_html    |     17.08 |               65.32 |    284.96 |   527.90 |  2,857.74 |
-| scraper     |     66.81 |              399.16 |  1,589.29 | 3,193.92 | 11,346.75 |
+| Parser      | iniconfig | Bootstrap dashboard | Rust Book | PEP 8 | PEP index |
+| ----------- | --------: | ------------------: | --------: | ----: | --------: |
+| astral-html |       5.7 |                31.2 |       146 |   301 |     1,116 |
+| tl          |      14.7 |                52.3 |       219 |   454 |     1,766 |
+| html5gum    |      14.9 |                  95 |       394 |   870 |     2,914 |
+| lol_html    |      17.0 |                65.3 |       284 |   527 |     2,857 |
+| scraper     |      66.8 |                 399 |     1,589 | 3,193 |    11,346 |
 
 <sub>Times in microseconds (µs);
 [lower is better](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
@@ -38,11 +38,11 @@ drop the output (`astral_html::Reader`).
 Parse HTML into each library's native document and drop it
 (`astral_html::Document`).
 
-| Parser      | iniconfig | Bootstrap dashboard | Rust Book |    PEP 8 | PEP index |
-| ----------- | --------: | ------------------: | --------: | -------: | --------: |
-| astral-html |      5.46 |               35.41 |    147.94 |   325.13 |  1,024.94 |
-| tl          |      8.23 |               48.86 |    192.51 |   394.16 |  1,124.35 |
-| scraper     |     63.11 |              378.35 |  1,570.03 | 3,090.82 |  9,958.86 |
+| Parser      | iniconfig | Bootstrap dashboard | Rust Book | PEP 8 | PEP index |
+| ----------- | --------: | ------------------: | --------: | ----: | --------: |
+| astral-html |      5.46 |                  35 |       147 |   325 |     1,024 |
+| tl          |       8.2 |                  48 |       192 |   394 |     1,124 |
+| scraper     |      63.1 |                 378 |     1,570 | 3,090 |     9,958 |
 
 <sub>Times in microseconds (µs);
 [lower is better](https://github.com/astral-sh/astral-html/blob/7ea072add99590685672de232f2a3637baceeba2/benchmarks/results/README.md).</sub>
