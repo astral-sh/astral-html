@@ -1,0 +1,51 @@
+{
+  "live": [
+    ["astral-home", "https://astral.sh/"],
+    ["uv-home", "https://docs.astral.sh/uv/"],
+    ["uv-projects", "https://docs.astral.sh/uv/concepts/projects/"],
+    ["uv-project-guide", "https://docs.astral.sh/uv/guides/projects/"],
+    ["uv-cli", "https://docs.astral.sh/uv/reference/cli/"],
+    ["ruff-home", "https://docs.astral.sh/ruff/"],
+    ["ruff-rules", "https://docs.astral.sh/ruff/rules/"],
+    ["ty-home", "https://docs.astral.sh/ty/"],
+    ["github-home", "https://github.com/"],
+    ["github-uv", "https://github.com/astral-sh/uv"],
+    ["github-html5ever", "https://github.com/servo/html5ever"],
+    ["github-parse5", "https://github.com/inikulin/parse5"],
+    ["github-whatwg-html", "https://github.com/whatwg/html"],
+    ["github-rust", "https://github.com/rust-lang/rust"],
+    ["crates-astral-html", "https://crates.io/crates/astral-html"],
+    ["crates-html5ever", "https://crates.io/crates/html5ever"],
+    ["node-home", "https://nodejs.org/en"],
+    ["node-download", "https://nodejs.org/en/download"],
+    ["go-home", "https://go.dev/"],
+    ["go-doc", "https://go.dev/doc/"],
+    ["go-blog", "https://go.dev/blog/"],
+    ["openai-home", "https://openai.com/"],
+    ["chatgpt-home", "https://chatgpt.com/"],
+    ["buildkite-home", "https://www.buildkite.com/"]
+  ],
+  "parse5_revision": "e65eae9a9dc27f1b7eb71868d245ca83070ccc4a",
+  "parse5_paths": [
+    ["cern", "test/data/location-info/cern/data.html"],
+    ["dx", "test/data/location-info/dx/data.html"],
+    ["github-parse5-captured", "test/data/location-info/github-parse5/data.html"],
+    ["whatwg-html-captured", "test/data/location-info/whatwg-html/data.html"],
+    ["wiki-42", "test/data/location-info/wiki-42/data.html"],
+    ["huge-page", "test/data/huge-page/huge-page.html"],
+    ["lhc", "test/data/sax/lhc/src.html"],
+    ["nodejs-captured", "test/data/sax/nodejsorg/src.html"],
+    ["npm-captured", "test/data/sax/npmorg/src.html"]
+  ],
+  "wpt_revision": "3d8a779128cf89fff4732953eff7bbac682b3063",
+  "wpt_paths": [
+    ["ambiguous-ampersand", "html/syntax/parsing/ambiguous-ampersand.html"],
+    ["newline-normalization", "html/syntax/parsing/newline-normalization-cr-then-lf.html"],
+    ["truncated-markup", "html/syntax/parsing/truncated-markup-declaration-at-eof.html"],
+    ["no-doctype-space", "html/syntax/parsing/support/no-doctype-name-space.html"],
+    ["no-doctype-line", "html/syntax/parsing/support/no-doctype-name-line.html"],
+    ["no-doctype-eof", "html/syntax/parsing/support/no-doctype-name-eof.html"],
+    ["doctype-empty-frameset", "html/syntax/parsing/support/doctype-system-id-empty-frameset.html"],
+    ["doctype-missing-transitional", "html/syntax/parsing/support/doctype-system-id-missing-transitional.html"]
+  ]
+}
