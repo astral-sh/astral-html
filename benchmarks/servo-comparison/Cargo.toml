@@ -1,0 +1,15 @@
+[package]
+name = "astral-servo-comparison"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+resilient = []
+
+[dependencies]
+astral-html = { path = "../../crates/astral-html" }
+html5ever = "=0.39.0"
+markup5ever_rcdom = "=0.39.0"
