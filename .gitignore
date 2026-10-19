@@ -9,5 +9,5 @@
 /fuzz/final-corpus/
 *.profraw
 
-/.corpus/
+/.corpus
 __pycache__/
