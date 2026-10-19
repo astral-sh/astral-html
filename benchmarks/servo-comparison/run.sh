@@ -48,6 +48,7 @@ EOF
     echo "rustc=$(rustc --version)"
     echo "cargo=$(cargo --version)"
     echo "corpus_directory=$corpus_directory"
+    echo "benchmark_cpu=${BENCHMARK_CPU:-all available CPUs}"
     echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     uname -a
     lscpu | grep -E '^Model name:|^CPU\(s\):|^Architecture:' || true
@@ -64,11 +65,19 @@ cargo build --manifest-path "$temporary_directory/Cargo.toml" --release --locked
 baseline_binary="$benchmark_dir/target/release/astral-servo-comparison"
 resilient_binary="$temporary_directory/target/release/astral-servo-comparison"
 
-"$baseline_binary" "$corpus_directory" > "$results_directory/baseline-1.tsv"
-"$resilient_binary" "$corpus_directory" > "$results_directory/recovering-1.tsv"
-"$resilient_binary" "$corpus_directory" > "$results_directory/recovering-2.tsv"
-"$baseline_binary" "$corpus_directory" > "$results_directory/baseline-2.tsv"
-"$baseline_binary" "$corpus_directory" > "$results_directory/baseline-3.tsv"
-"$resilient_binary" "$corpus_directory" > "$results_directory/recovering-3.tsv"
+benchmark_binary() {
+    if [ -n "${BENCHMARK_CPU:-}" ]; then
+        taskset -c "$BENCHMARK_CPU" "$@"
+    else
+        "$@"
+    fi
+}
 
-python3 "$benchmark_dir/summarize.py" "$results_directory"
+benchmark_binary "$baseline_binary" "$corpus_directory" > "$results_directory/baseline-1.tsv"
+benchmark_binary "$resilient_binary" "$corpus_directory" > "$results_directory/recovering-1.tsv"
+benchmark_binary "$resilient_binary" "$corpus_directory" > "$results_directory/recovering-2.tsv"
+benchmark_binary "$baseline_binary" "$corpus_directory" > "$results_directory/baseline-2.tsv"
+benchmark_binary "$baseline_binary" "$corpus_directory" > "$results_directory/baseline-3.tsv"
+benchmark_binary "$resilient_binary" "$corpus_directory" > "$results_directory/recovering-3.tsv"
+
+python3 "$benchmark_dir/summarize.py" "$results_directory" | tee "$results_directory/summary.txt"
