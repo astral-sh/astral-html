@@ -87,6 +87,11 @@ for token in Reader::new(source) {
 }
 ```
 
+Pages that omit common closing tags can use `Document::parse_recovering(source)`
+to make paragraphs, list items, headings, options, and table rows and cells
+siblings where appropriate. It retains source order and does not build a browser
+DOM; see [recovery semantics](docs/conformance.md#reader-and-document-semantics).
+
 ## License
 
 astral-html is licensed under either of

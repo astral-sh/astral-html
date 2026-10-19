@@ -85,6 +85,23 @@ elements are not reconstructed, and absent `html`, `head`, and `body` elements
 are not inserted. Encoding detection, CSS selectors, script execution, mutation,
 and serialization are out of scope.
 
+`Document::parse_recovering` and `Document::parse_recovering_with_limits` offer
+source-order recovery for common optional end tags. A new paragraph or block
+start closes an open paragraph; successive list items, description items,
+headings, options, option groups, table cells, rows, and table sections close
+their corresponding open scopes. A `body` start closes an open `head`.
+Nested lists, tables, and selects do not close items in outer containers.
+Recovery happens before checking the depth limit for the incoming tag, so pages
+with omitted optional end tags can stay within their configured depth. The
+lexical `parse` APIs keep their original source-scope behavior.
+
+Recovery never inserts or moves nodes. Browser insertion modes, table foster
+parenting and implicit table containers, formatting reconstruction, and foreign
+content remain unsupported. In particular, a `td` without a `tr` stays where it
+appears in source order, and malformed table text stays inside its lexical
+parent. An unmatched end tag is still ignored. This mode is useful for extracting
+data from imperfect pages, not for reproducing the browser DOM or sanitizing HTML.
+
 Names use ASCII case folding. Duplicate attributes keep the first normalized
 name. Attribute values are decoded exactly once; `raw_value` preserves their
 input spelling and distinguishes boolean attributes from explicit empty values.

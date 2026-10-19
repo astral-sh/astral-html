@@ -157,6 +157,52 @@ fn enforces_limits_at_boundaries() {
 }
 
 #[test]
+fn recovering_optional_end_tags_respects_limits_and_repeated_names() {
+    let limits = Limits {
+        max_depth: 2,
+        ..Limits::default()
+    };
+    let source = "<ul><li>one<li>two<li>three</ul>";
+    assert!(matches!(
+        Document::parse_with_limits(source, limits),
+        Err(Error::DepthLimit)
+    ));
+    let document = Document::parse_recovering_with_limits(source, limits).unwrap();
+    let items: Vec<_> = document
+        .elements()
+        .filter(|element| element.is("li"))
+        .collect();
+    assert_eq!(items.len(), 3);
+    assert_eq!(
+        items.iter().map(|item| item.text()).collect::<Vec<_>>(),
+        ["one", "two", "three"]
+    );
+
+    // A deep mismatch promotes the name index before an implied close. Closing
+    // the inner list must restore the outer list item's scope.
+    let source = "<main><div><section><article><aside><nav><form><fieldset><ul><li>outer<ul><li>inner<li>next</ul><li>last</ul><p>after</main>";
+    let document = Document::parse_recovering(source).unwrap();
+    let items: Vec<_> = document
+        .elements()
+        .filter(|element| element.is("li"))
+        .collect();
+    assert_eq!(
+        items.iter().map(|item| item.text()).collect::<Vec<_>>(),
+        ["outerinnernext", "inner", "next", "last"]
+    );
+    assert_eq!(items[1].parent().unwrap().name(), "ul");
+    assert_eq!(items[3].parent().unwrap().name(), "ul");
+    assert_eq!(
+        document
+            .elements()
+            .find(|element| element.is("p"))
+            .unwrap()
+            .text(),
+        "after"
+    );
+}
+
+#[test]
 fn literal_less_than_runs_use_one_text_node() {
     let text = "<0".repeat(32_768);
     let source = format!("<a>{text}</a>");

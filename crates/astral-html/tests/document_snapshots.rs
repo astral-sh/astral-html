@@ -7,6 +7,10 @@ use astral_html::Document;
 /// Show query results without depending on internal node indices or debug output.
 fn describe(source: &str) -> String {
     let document = Document::parse(source).unwrap();
+    describe_document(&document)
+}
+
+fn describe_document(document: &Document<'_>) -> String {
     let mut output = String::new();
     for element in document.elements() {
         writeln!(
@@ -37,6 +41,56 @@ fn describe(source: &str) -> String {
         }
     }
     output
+}
+
+#[test]
+fn recovering_optional_end_tags() {
+    let source = "<main><p>first<p>second<div>block</div><ul><li>one<li><b>two</b><ul><li>inner<li>next</ul><li>last</ul><h1>title<h2>subtitle</main>";
+    let document = Document::parse_recovering(source).unwrap();
+    insta::assert_snapshot!(describe_document(&document), @r#"
+    <main> parent=None children=["p", "p", "div", "ul", "h1", "h2"] descendants=["p", "p", "div", "ul", "li", "li", "b", "ul", "li", "li", "li", "h1", "h2"] text="firstsecondblockonetwoinnernextlasttitlesubtitle"
+    <p> parent=Some("main") children=[] descendants=[] text="first"
+    <p> parent=Some("main") children=[] descendants=[] text="second"
+    <div> parent=Some("main") children=[] descendants=[] text="block"
+    <ul> parent=Some("main") children=["li", "li", "li"] descendants=["li", "li", "b", "ul", "li", "li", "li"] text="onetwoinnernextlast"
+    <li> parent=Some("ul") children=[] descendants=[] text="one"
+    <li> parent=Some("ul") children=["b", "ul"] descendants=["b", "ul", "li", "li"] text="twoinnernext"
+    <b> parent=Some("li") children=[] descendants=[] text="two"
+    <ul> parent=Some("li") children=["li", "li"] descendants=["li", "li"] text="innernext"
+    <li> parent=Some("ul") children=[] descendants=[] text="inner"
+    <li> parent=Some("ul") children=[] descendants=[] text="next"
+    <li> parent=Some("ul") children=[] descendants=[] text="last"
+    <h1> parent=Some("main") children=[] descendants=[] text="title"
+    <h2> parent=Some("main") children=[] descendants=[] text="subtitle"
+    "#);
+}
+
+#[test]
+fn recovering_table_and_select_scopes() {
+    let source = "<table><thead><tr><th>name<th>value<tbody><tr><td>one<td><b>two<tr><td>three</table><select><optgroup label=a><option>red<option>blue<optgroup label=b><option>green</select>";
+    let document = Document::parse_recovering(source).unwrap();
+    insta::assert_snapshot!(describe_document(&document), @r#"
+    <table> parent=None children=["thead", "tbody"] descendants=["thead", "tr", "th", "th", "tbody", "tr", "td", "td", "b", "tr", "td"] text="namevalueonetwothree"
+    <thead> parent=Some("table") children=["tr"] descendants=["tr", "th", "th"] text="namevalue"
+    <tr> parent=Some("thead") children=["th", "th"] descendants=["th", "th"] text="namevalue"
+    <th> parent=Some("tr") children=[] descendants=[] text="name"
+    <th> parent=Some("tr") children=[] descendants=[] text="value"
+    <tbody> parent=Some("table") children=["tr", "tr"] descendants=["tr", "td", "td", "b", "tr", "td"] text="onetwothree"
+    <tr> parent=Some("tbody") children=["td", "td"] descendants=["td", "td", "b"] text="onetwo"
+    <td> parent=Some("tr") children=[] descendants=[] text="one"
+    <td> parent=Some("tr") children=["b"] descendants=["b"] text="two"
+    <b> parent=Some("td") children=[] descendants=[] text="two"
+    <tr> parent=Some("tbody") children=["td"] descendants=["td"] text="three"
+    <td> parent=Some("tr") children=[] descendants=[] text="three"
+    <select> parent=None children=["optgroup", "optgroup"] descendants=["optgroup", "option", "option", "optgroup", "option"] text="redbluegreen"
+    <optgroup> parent=Some("select") children=["option", "option"] descendants=["option", "option"] text="redblue"
+      label value="a" raw=Some("a")
+    <option> parent=Some("optgroup") children=[] descendants=[] text="red"
+    <option> parent=Some("optgroup") children=[] descendants=[] text="blue"
+    <optgroup> parent=Some("select") children=["option"] descendants=["option"] text="green"
+      label value="b" raw=Some("b")
+    <option> parent=Some("optgroup") children=[] descendants=[] text="green"
+    "#);
 }
 
 #[test]

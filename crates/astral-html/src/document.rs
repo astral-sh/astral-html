@@ -95,6 +95,8 @@ struct Open {
     node: usize,
     // Previous stack depth with the same name, once the name index is enabled.
     previous: Option<usize>,
+    // Optional-end-tag kinds at this depth or above, for constant-time misses.
+    recovery_mask: u16,
 }
 
 impl<'a> Document<'a> {
@@ -103,11 +105,31 @@ impl<'a> Document<'a> {
         Self::parse_with_limits(source, Limits::default())
     }
 
+    /// Parse with common HTML optional-end-tag recovery and default limits.
+    ///
+    /// Paragraphs, list items, description items, headings, options, and table
+    /// rows and cells close when a subsequent start tag implies their end. This
+    /// improves traversal of pages with omitted end tags, but does not implement
+    /// browser tree construction: nodes are never inserted or moved. Use
+    /// [`Self::parse`] when exact lexical scopes are required.
+    pub fn parse_recovering(source: &'a str) -> Result<Self, Error> {
+        Self::parse_recovering_with_limits(source, Limits::default())
+    }
+
+    /// Parse with common optional-end-tag recovery and caller-selected limits.
+    pub fn parse_recovering_with_limits(source: &'a str, limits: Limits) -> Result<Self, Error> {
+        Self::parse_inner(source, limits, true)
+    }
+
     /// Parse a document with caller-selected resource limits.
     ///
     /// Malformed HTML follows tokenizer recovery and lexical scope rules. Only
     /// resource-limit violations return errors; no partial document is returned.
     pub fn parse_with_limits(source: &'a str, limits: Limits) -> Result<Self, Error> {
+        Self::parse_inner(source, limits, false)
+    }
+
+    fn parse_inner(source: &'a str, limits: Limits, recovering: bool) -> Result<Self, Error> {
         if source.len() > limits.max_input_bytes {
             return Err(Error::InputLimit);
         }
@@ -124,6 +146,9 @@ impl<'a> Document<'a> {
         while let Some(token) = reader.next_with_attribute_buffer(&mut attribute_buffer) {
             let mut attributes = match token {
                 Token::StartTag(mut tag) => {
+                    if recovering {
+                        document.recover_start(&tag.name, &mut open, &mut names);
+                    }
                     let is_void = is_void(&tag.name);
                     if !is_void && open.len() >= limits.max_depth {
                         return Err(Error::DepthLimit);
@@ -139,9 +164,16 @@ impl<'a> Document<'a> {
                         let previous = names
                             .as_mut()
                             .and_then(|names| names.insert(tag.name.clone(), open.len()));
+                        let recovery_mask = if recovering {
+                            open.last().map_or(0, |entry| entry.recovery_mask)
+                                | recovery_bit(&tag.name)
+                        } else {
+                            0
+                        };
                         open.push(Open {
                             node: index,
                             previous,
+                            recovery_mask,
                         });
                     }
                     let start = document.attributes.len();
@@ -215,6 +247,117 @@ impl<'a> Document<'a> {
         }
         document.close(&mut open, &mut names, 0);
         Ok(document)
+    }
+
+    /// Close only within the relevant list, table, or select scope. A nested
+    /// container must not close an item in an outer container of the same kind.
+    fn close_optional(
+        &mut self,
+        open: &mut Vec<Open>,
+        names: &mut Option<HashMap<Cow<'a, str>, usize>>,
+        targets: &[&str],
+        barriers: &[&str],
+    ) {
+        let target_mask = targets
+            .iter()
+            .fold(0, |mask, name| mask | recovery_bit(name));
+        if open
+            .last()
+            .is_none_or(|entry| entry.recovery_mask & target_mask == 0)
+        {
+            return;
+        }
+        for (depth, entry) in open.iter().enumerate().rev() {
+            let Kind::Element(tag) = &self.nodes[entry.node].kind else {
+                continue;
+            };
+            if targets.contains(&tag.name.as_ref()) {
+                self.close(open, names, depth);
+                return;
+            }
+            if barriers.contains(&tag.name.as_ref()) {
+                return;
+            }
+        }
+    }
+
+    fn recover_start(
+        &mut self,
+        name: &str,
+        open: &mut Vec<Open>,
+        names: &mut Option<HashMap<Cow<'a, str>, usize>>,
+    ) {
+        match name {
+            "li" => self.close_optional(open, names, &["li"], &["ol", "ul"]),
+            "dt" | "dd" => self.close_optional(open, names, &["dt", "dd"], &["dl"]),
+            "option" => self.close_optional(open, names, &["option"], &["select", "datalist"]),
+            "optgroup" => {
+                self.close_optional(open, names, &["option"], &["select", "datalist"]);
+                self.close_optional(open, names, &["optgroup"], &["select", "datalist"]);
+            }
+            "td" | "th" => {
+                self.close_optional(open, names, &["td", "th"], &["tr", "table"]);
+            }
+            "tr" => {
+                self.close_optional(open, names, &["td", "th"], &["tr", "table"]);
+                self.close_optional(open, names, &["tr"], &["table"]);
+            }
+            "tbody" | "thead" | "tfoot" => {
+                self.close_optional(open, names, &["td", "th"], &["tr", "table"]);
+                self.close_optional(open, names, &["tr"], &["table"]);
+                self.close_optional(open, names, &["tbody", "thead", "tfoot"], &["table"]);
+            }
+            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+                self.close_optional(open, names, &["h1", "h2", "h3", "h4", "h5", "h6"], &[]);
+            }
+            _ => {}
+        }
+
+        if matches!(
+            name,
+            "address"
+                | "article"
+                | "aside"
+                | "blockquote"
+                | "center"
+                | "details"
+                | "dialog"
+                | "dir"
+                | "div"
+                | "dl"
+                | "fieldset"
+                | "figcaption"
+                | "figure"
+                | "footer"
+                | "form"
+                | "h1"
+                | "h2"
+                | "h3"
+                | "h4"
+                | "h5"
+                | "h6"
+                | "header"
+                | "hgroup"
+                | "hr"
+                | "legend"
+                | "listing"
+                | "main"
+                | "menu"
+                | "nav"
+                | "ol"
+                | "p"
+                | "pre"
+                | "search"
+                | "section"
+                | "summary"
+                | "table"
+                | "ul"
+        ) {
+            self.close_optional(open, names, &["p"], &["button", "table"]);
+        }
+        if name == "body" {
+            self.close_optional(open, names, &["head"], &["html"]);
+        }
     }
 
     /// Close open elements through `depth`, restoring previous same-name scopes.
@@ -413,4 +556,21 @@ fn is_void(name: &str) -> bool {
             | "track"
             | "wbr"
     )
+}
+
+/// Bits summarize only names used as implicit end-tag targets.
+fn recovery_bit(name: &str) -> u16 {
+    match name {
+        "p" => 1 << 0,
+        "li" => 1 << 1,
+        "dt" | "dd" => 1 << 2,
+        "option" => 1 << 3,
+        "optgroup" => 1 << 4,
+        "td" | "th" => 1 << 5,
+        "tr" => 1 << 6,
+        "tbody" | "thead" | "tfoot" => 1 << 7,
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => 1 << 8,
+        "head" => 1 << 9,
+        _ => 0,
+    }
 }
