@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.0.4
+
+Released on 2026-10-20.
+
+### Bug fixes
+
+- Select text modes according to SVG and HTML integration context so well-formed
+  SVG no longer causes `Reader` or `Document` to consume following HTML as text
+  ([astral-sh/astral-html#85](https://github.com/astral-sh/astral-html/pull/85))
+- Honor self-closing SVG elements so they no longer remain open and incorrectly
+  exhaust `Document`'s depth limit
+  ([astral-sh/astral-html#85](https://github.com/astral-sh/astral-html/pull/85))
+- Preserve CDATA sections as text while parsing SVG content
+  ([astral-sh/astral-html#85](https://github.com/astral-sh/astral-html/pull/85))
+- Close an immediately open HTML `a` or `option` when another start tag has the
+  same name, preventing sibling runs from incorrectly hitting `Document`'s depth
+  limit
+  ([astral-sh/astral-html#86](https://github.com/astral-sh/astral-html/pull/86))
+
+### Performance
+
+- Borrow unchanged comment text during tokenizer recovery, avoiding allocations
+  unless newline or NUL normalization is required
+  ([astral-sh/astral-html#75](https://github.com/astral-sh/astral-html/pull/75))
+
+### Other changes
+
+- Document where `Reader` and `Document` differ from browser parsing and warn
+  against using their output to approve HTML for rendering
+  ([astral-sh/astral-html#78](https://github.com/astral-sh/astral-html/pull/78))
+- Clarify that `Doctype::force_quirks == false` does not by itself indicate
+  standards mode
+  ([astral-sh/astral-html#78](https://github.com/astral-sh/astral-html/pull/78))
+- Add README highlights for the crate's runtime dependency, unsafe-code policy,
+  and html5lib tokenizer test coverage
+  ([astral-sh/astral-html#77](https://github.com/astral-sh/astral-html/pull/77))
+- Round README benchmark results to match their measurement precision
+  ([astral-sh/astral-html#83](https://github.com/astral-sh/astral-html/pull/83))
+
 ## 0.0.3
 
 Released on 2026-10-05.
