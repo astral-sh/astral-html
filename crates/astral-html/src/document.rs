@@ -21,7 +21,8 @@ pub struct Limits {
     pub max_input_bytes: usize,
     /// Maximum total number of retained element and text nodes (default: 4 million).
     pub max_nodes: usize,
-    /// Maximum number of simultaneously open non-void elements (default: 256).
+    /// Maximum number of simultaneously open non-void elements in either lexical
+    /// document scopes or the SVG parsing context (default: 256).
     pub max_depth: usize,
 }
 
@@ -130,7 +131,10 @@ impl<'a> Document<'a> {
             let mut attributes = match tokenizer.next_with_attribute_buffer(&mut attribute_buffer) {
                 Some(Token::StartTag(mut tag)) => {
                     let is_void = context.start_tag::<true>(&mut tokenizer, &tag);
-                    if !is_void && open.len() >= limits.max_depth {
+                    // The context includes this tag; the lexical scope does not yet.
+                    if !is_void
+                        && (open.len() >= limits.max_depth || context.depth() > limits.max_depth)
+                    {
                         return Err(Error::DepthLimit);
                     }
                     let index = document.nodes.len();

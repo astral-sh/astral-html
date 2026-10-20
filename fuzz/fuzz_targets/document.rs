@@ -74,7 +74,7 @@ impl<'a> Model<'a> {
                             foreign.push(index);
                         }
                         open.push(index);
-                        model.depth = model.depth.max(open.len());
+                        model.depth = model.depth.max(open.len()).max(foreign.len());
                     }
                 }
                 Token::EndTag(tag) => {

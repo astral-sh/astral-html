@@ -282,3 +282,15 @@ fn svg_self_closing_siblings_do_not_accumulate_depth() {
         Err(Error::DepthLimit)
     ));
 }
+
+#[test]
+fn svg_context_counts_toward_depth_limit() {
+    let limits = Limits {
+        max_depth: 2,
+        ..Limits::default()
+    };
+    assert!(matches!(
+        Document::parse_with_limits("<div><svg></div><g><path>", limits),
+        Err(Error::DepthLimit)
+    ));
+}

@@ -59,6 +59,10 @@ impl<'a> Reader<'a> {
 }
 
 impl<'a> Context<'a> {
+    pub(crate) fn depth(&self) -> usize {
+        self.svg_scopes.len()
+    }
+
     /// Select the tag's text state. Document also needs to know whether it closes
     /// immediately; Reader can skip classifying HTML void elements.
     // Inlining this dispatch can make the tokenizer loop spill the token to the stack.
