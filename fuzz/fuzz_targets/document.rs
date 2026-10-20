@@ -15,6 +15,7 @@ struct Model<'a> {
 
 struct ModelElement<'a> {
     tag: Tag<'a>,
+    svg: bool,
     parent: Option<usize>,
     children: Vec<Child<'a>>,
 }
@@ -32,14 +33,30 @@ impl<'a> Model<'a> {
             depth: 0,
         };
         let mut open: Vec<usize> = Vec::new();
+        // Foreign-content processing can end without closing lexical ancestors.
+        // Keep that context separately, using linear searches on this bounded input.
+        let mut foreign: Vec<usize> = Vec::new();
         for token in Reader::new(source) {
             match token {
                 Token::StartTag(tag) => {
-                    let is_void = [
-                        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
-                        "param", "source", "track", "wbr",
-                    ]
-                    .contains(&tag.name.as_ref());
+                    let svg_children = foreign.last().is_some_and(|&i| model.svg_children(i));
+                    let svg = if svg_children && breaks_out_of_svg(&tag) {
+                        while foreign.last().is_some_and(|&i| model.svg_children(i)) {
+                            foreign.pop();
+                        }
+                        false
+                    } else {
+                        svg_children || tag.name == "svg"
+                    };
+                    let is_void = if svg {
+                        tag.self_closing
+                    } else {
+                        [
+                            "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+                            "meta", "param", "source", "track", "wbr",
+                        ]
+                        .contains(&tag.name.as_ref())
+                    };
                     let index = model.elements.len();
                     let parent = open.last().copied();
                     if let Some(parent) = parent {
@@ -47,16 +64,31 @@ impl<'a> Model<'a> {
                     }
                     model.elements.push(ModelElement {
                         tag,
+                        svg,
                         parent,
                         children: Vec::new(),
                     });
                     model.nodes += 1;
                     if !is_void {
+                        if svg || !foreign.is_empty() {
+                            foreign.push(index);
+                        }
                         open.push(index);
-                        model.depth = model.depth.max(open.len());
+                        model.depth = model.depth.max(open.len()).max(foreign.len());
                     }
                 }
                 Token::EndTag(tag) => {
+                    if matches!(tag.name.as_ref(), "br" | "p") {
+                        while foreign.last().is_some_and(|&i| model.svg_children(i)) {
+                            foreign.pop();
+                        }
+                    }
+                    if let Some(i) = foreign
+                        .iter()
+                        .rposition(|&i| model.elements[i].tag.name == tag.name)
+                    {
+                        foreign.truncate(i);
+                    }
                     if let Some(position) = open
                         .iter()
                         .rposition(|&index| model.elements[index].tag.name == tag.name)
@@ -74,6 +106,15 @@ impl<'a> Model<'a> {
             }
         }
         model
+    }
+
+    fn svg_children(&self, index: usize) -> bool {
+        let element = &self.elements[index];
+        element.svg
+            && !matches!(
+                element.tag.name.as_ref(),
+                "desc" | "title" | "foreignobject"
+            )
     }
 
     /// Walk descendant elements and text in source order, excluding the root.
@@ -142,6 +183,21 @@ impl<'a> Model<'a> {
             }
             assert!(descendants.next().is_none(), "unexpected descendant");
         }
+    }
+}
+
+fn breaks_out_of_svg(tag: &Tag<'_>) -> bool {
+    match tag.name.as_ref() {
+        "b" | "big" | "blockquote" | "body" | "br" | "center" | "code" | "dd" | "div" | "dl"
+        | "dt" | "em" | "embed" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "head" | "hr" | "i"
+        | "img" | "li" | "listing" | "menu" | "meta" | "nobr" | "ol" | "p" | "pre" | "ruby"
+        | "s" | "small" | "span" | "strong" | "strike" | "sub" | "sup" | "table" | "tt" | "u"
+        | "ul" | "var" => true,
+        "font" => tag
+            .attributes
+            .iter()
+            .any(|attribute| matches!(attribute.name.as_ref(), "color" | "face" | "size")),
+        _ => false,
     }
 }
 

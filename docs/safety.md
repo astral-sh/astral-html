@@ -3,7 +3,7 @@
 The parser crate forbids unsafe Rust, performs no I/O, and executes no scripts.
 It is not an HTML sanitizer. Allocator selection belongs to the application.
 
-For `<svg><style><img src=x onerror=alert(1)>`, `Reader` and `Document` return
+For `<math><style><img src=x onerror=alert(1)>`, `Reader` and `Document` return
 the `img` markup as style text; a browser can create an `img` with an `onerror`
 handler. Do not use parser output to approve HTML for rendering. Decoded
 attributes remain untrusted: callers must validate URLs and escape values for
@@ -26,7 +26,8 @@ accumulation.
 | Simultaneously open non-void elements |       256 |
 
 `Document::parse_with_limits` accepts caller-supplied limits. Input size is
-checked before tokenization.
+checked before tokenization. The depth limit applies to both lexical document
+scopes and SVG parsing context, which can diverge on malformed input.
 
 Node and depth limits are checked before retaining the next node. The current
 token's strings and attributes may already have been allocated. Limits do not

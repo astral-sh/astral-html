@@ -172,3 +172,59 @@ fn cloned_tokenizers_keep_independent_positions_and_context() {
     assert!(matches!(text_mode.next(), Some(Token::EndTag(tag)) if tag.name == "title"));
     assert_eq!(text_mode.next(), None);
 }
+
+#[test]
+fn svg_context_keeps_real_links_and_suppresses_text_markup() {
+    let cases = [
+        "<svg><title/><script/><style/></svg>",
+        "<svg/><title/><a href=ghost></title>",
+        "<svg><g><div><style><a href=ghost></style>",
+        "<svg></div><title/>",
+        "<svg><g><g><g><g><g><g><g><g></missing></svg><style><a href=ghost></style>",
+        "<svg></p><script><a href=ghost></script>",
+        "<svg><font color=red><title><a href=ghost></title>",
+        "<svg><foreignObject><svg><desc></svg></svg><style><a href=ghost></style>",
+        "<svg><title><title>x</title><style><a href=ghost></style></title></svg>",
+        "<svg><desc><desc>x</desc><style><a href=ghost></style></desc></svg>",
+        concat!(
+            "<svg><foreignObject><foreignObject>x</foreignObject>",
+            "<style><a href=ghost></style></foreignObject></svg>"
+        ),
+    ];
+    for source in cases {
+        let source = format!("{source}<a href=real>real</a>");
+        let links = Reader::new(&source)
+            .filter_map(|token| match token {
+                Token::StartTag(tag) if tag.name == "a" => {
+                    Some(tag.attributes[0].value.to_string())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(links, ["real"], "{source}");
+    }
+}
+
+#[test]
+fn svg_cdata_depends_on_the_current_element() {
+    for element in ["g", "style", "script", "title", "desc", "foreignObject"] {
+        let source = format!("<svg><{element}><![CDATA[> <a>&amp;]]></{element}></svg>");
+        let text = Reader::new(&source)
+            .filter_map(|token| match token {
+                Token::Text(text) => Some(text.into_owned()),
+                _ => None,
+            })
+            .collect::<String>();
+        assert_eq!(text, "> <a>&amp;", "{source}");
+    }
+    for source in [
+        "<![CDATA[> <a>]]>",
+        "<svg><foreignObject><div><![CDATA[> <a>]]></div></foreignObject></svg>",
+    ] {
+        assert!(
+            Reader::new(source)
+                .any(|token| { matches!(token, Token::StartTag(tag) if tag.name == "a") }),
+            "{source}"
+        );
+    }
+}

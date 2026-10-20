@@ -159,3 +159,25 @@ fn noscript_contains_markup_and_plaintext_runs_to_eof() {
     <plaintext> parent=None children=[] descendants=[] text="&amp;<b>literal</b>"
     "#);
 }
+
+#[test]
+fn svg_self_closing_elements_and_html_integration() {
+    let document = Document::parse(concat!(
+        "<svg><title/><path/><foreignObject><div/>text<br>",
+        "<svg/></div></foreignObject><path/></svg><a>link</a>",
+    ))
+    .unwrap();
+    let scopes = document
+        .elements()
+        .map(|element| {
+            let parent = element
+                .parent()
+                .map(|parent| parent.name())
+                .unwrap_or("root");
+            format!("{}:{parent}", element.name())
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    insta::assert_snapshot!(scopes, @"svg:root title:svg path:svg foreignobject:svg \
+        div:foreignobject br:div svg:div path:svg a:root");
+}

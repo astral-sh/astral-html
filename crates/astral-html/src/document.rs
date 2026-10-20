@@ -6,8 +6,9 @@ use std::fmt;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
+use crate::reader::Context;
 use crate::tokenizer::matches_normalized_name;
-use crate::{Attribute, Reader, Token};
+use crate::{Attribute, Token, Tokenizer};
 
 /// Resource limits for constructing a document.
 ///
@@ -20,7 +21,8 @@ pub struct Limits {
     pub max_input_bytes: usize,
     /// Maximum total number of retained element and text nodes (default: 4 million).
     pub max_nodes: usize,
-    /// Maximum number of simultaneously open non-void elements (default: 256).
+    /// Maximum number of simultaneously open non-void elements in either lexical
+    /// document scopes or the SVG parsing context (default: 256).
     pub max_depth: usize,
 }
 
@@ -62,10 +64,12 @@ impl std::error::Error for Error {}
 /// Each emitted start tag creates an element. An end tag closes the innermost
 /// open element with that name and its descendants; unmatched end tags are
 /// ignored. HTML void elements close immediately. The self-closing flag on other
-/// HTML elements is ignored. Remaining elements close at EOF. No elements are
+/// HTML elements is ignored; SVG self-closing elements close immediately.
+/// Remaining elements close at EOF. No elements are
 /// implied, relocated, or cloned: this is not the HTML browser tree-building algorithm.
 ///
-/// Text states follow [`Reader`], including inside SVG/MathML.
+/// Text states and SVG context follow [`Reader`](crate::Reader). HTML breakout from SVG changes
+/// text handling without closing lexical document scopes.
 ///
 /// Construction, traversal, and destruction use flat storage without recursion.
 pub struct Document<'a> {
@@ -119,13 +123,18 @@ impl<'a> Document<'a> {
         // Matching the top scope needs no index. Promote a deep stack on its
         // first mismatch, so repeated unmatched end tags remain bounded.
         let mut names: Option<HashMap<Cow<'a, str>, usize>> = None;
-        let mut reader = Reader::new(source);
+        let mut tokenizer = Tokenizer::new(source);
+        let mut context = Context::default();
         let mut attribute_buffer = Vec::new();
-        while let Some(token) = reader.next_with_attribute_buffer(&mut attribute_buffer) {
-            let mut attributes = match token {
-                Token::StartTag(mut tag) => {
-                    let is_void = is_void(&tag.name);
-                    if !is_void && open.len() >= limits.max_depth {
+        // Match the option and token together so dispatch need not copy the whole token.
+        loop {
+            let mut attributes = match tokenizer.next_with_attribute_buffer(&mut attribute_buffer) {
+                Some(Token::StartTag(mut tag)) => {
+                    let is_void = context.start_tag::<true>(&mut tokenizer, &tag);
+                    // The context includes this tag; the lexical scope does not yet.
+                    if !is_void
+                        && (open.len() >= limits.max_depth || context.depth() > limits.max_depth)
+                    {
                         return Err(Error::DepthLimit);
                     }
                     let index = document.nodes.len();
@@ -160,7 +169,8 @@ impl<'a> Document<'a> {
                     });
                     tag.attributes
                 }
-                Token::EndTag(tag) => {
+                Some(Token::EndTag(tag)) => {
+                    context.end_tag(&mut tokenizer, &tag);
                     let matches_top = open.last().is_some_and(|entry| {
                         matches!(&document.nodes[entry.node].kind, Kind::Element(start) if start.name == tag.name)
                     });
@@ -184,11 +194,17 @@ impl<'a> Document<'a> {
                         })
                     };
                     if let Some(depth) = depth {
-                        document.close(&mut open, &mut names, depth);
+                        if matches_top && names.is_none() {
+                            let end = document.nodes.len();
+                            let entry = open.pop().expect("top matched");
+                            document.nodes[entry.node].end = end;
+                        } else {
+                            document.close(&mut open, &mut names, depth);
+                        }
                     }
                     tag.attributes
                 }
-                Token::Text(text) => {
+                Some(Token::Text(text)) => {
                     if !text.is_empty() {
                         let index = document.nodes.len();
                         if index >= limits.max_nodes {
@@ -204,9 +220,12 @@ impl<'a> Document<'a> {
                     }
                     continue;
                 }
-                Token::Comment(_) | Token::Doctype(_) | Token::ProcessingInstruction { .. } => {
+                Some(
+                    Token::Comment(_) | Token::Doctype(_) | Token::ProcessingInstruction { .. },
+                ) => {
                     continue;
                 }
+                None => break,
             };
             attributes.clear();
             if attributes.capacity() > attribute_buffer.capacity() {
@@ -393,24 +412,4 @@ impl fmt::Debug for Element<'_, '_> {
             .field("index", &self.index)
             .finish()
     }
-}
-
-fn is_void(name: &str) -> bool {
-    matches!(
-        name,
-        "area"
-            | "base"
-            | "br"
-            | "col"
-            | "embed"
-            | "hr"
-            | "img"
-            | "input"
-            | "link"
-            | "meta"
-            | "param"
-            | "source"
-            | "track"
-            | "wbr"
-    )
 }
