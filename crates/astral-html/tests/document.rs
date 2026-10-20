@@ -266,3 +266,19 @@ fn name_queries_match_across_comparison_lengths() {
         assert!(element.attribute(&query).is_none());
     }
 }
+
+#[test]
+fn svg_self_closing_siblings_do_not_accumulate_depth() {
+    let source = "<svg><path/><path/></svg>";
+    let limits = Limits {
+        max_depth: 1,
+        ..Limits::default()
+    };
+    let document = Document::parse_with_limits(source, limits).unwrap();
+    let svg = document.elements().next().unwrap();
+    assert_eq!(svg.children().count(), 2);
+    assert!(matches!(
+        Document::parse_with_limits("<svg><path>", limits),
+        Err(Error::DepthLimit)
+    ));
+}

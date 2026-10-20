@@ -53,11 +53,13 @@ reader's start tags. An explicit child-graph model built from those tokens also
 checks every element's parent and ordered children. Descendant order and text
 are checked for all shallow elements, selected deeper levels, and every leaf,
 covering every element on eight pages while bounding repeated subtree work on
-the largest page. The oracle uses the same HTML-only, scripting-disabled context
-as `Reader`. Every page must run, with no expected failures or truncation. The
-largest page asserts rejection at the default depth limit, then runs with an
-explicit 10,000-level limit; the other pages use the defaults. These fixtures
-provide whole-page differential coverage, not browser DOM conformance.
+the largest page. The oracle selects HTML-only text modes with scripting
+disabled; these pinned pages do not exercise SVG cases that require different
+text modes or closing rules. Focused reader and document tests cover those
+cases. Every page must run, with no expected failures or truncation. The largest
+page asserts rejection at the default depth limit, then runs with an explicit
+10,000-level limit; the other pages use the defaults. These fixtures provide
+whole-page differential coverage, not browser DOM conformance.
 
 All imported suites are pinned by revision and retain upstream licenses. They
 run offline as ordinary Cargo integration tests.
@@ -67,17 +69,32 @@ run offline as ordinary Cargo integration tests.
 `Tokenizer` emits tokens without selecting tree-construction insertion modes.
 `Reader` selects text modes for HTML `title`, `textarea`, `style`, `script`,
 `xmp`, `iframe`, `noembed`, `noframes`, and `plaintext` elements. It assumes
-HTML context with scripting disabled. `noscript` therefore contains ordinary
-markup. It does not select SVG/MathML namespace transitions or foreign-content
-integration points. A caller with that context can select tokenizer states
-explicitly.
+scripting is disabled, so `noscript` contains ordinary markup. SVG elements stay
+in the data state, including SVG `title`, `script`, and `style`. Children of SVG
+`foreignObject`, `title`, and `desc` use HTML text modes; nested `svg` elements
+return to SVG context. Self-closing SVG tags do not open a context. Matching SVG
+boundary end tags close intervening integration points, and HTML breakout tags
+resume HTML processing even after an unclosed SVG element. Outer HTML ancestors
+are not tracked: in malformed markup such as `<div><svg></div>`, the outer HTML
+end tag leaves the reader in SVG context. This can change text handling after
+that end tag compared with a browser.
+
+CDATA sections are recognized when the current element is SVG, including
+integration points; HTML children of integration points use HTML declaration
+rules. This context tracking retains open element names inside SVG, including
+HTML descendants, without browser tree repair. MathML and namespace and
+attribute adjustments remain unsupported. A caller with that context can select
+tokenizer states explicitly. Context storage grows with open elements inside SVG
+and any owned normalized names; HTML-only input needs no context allocation.
 
 `Document` retains source-order elements and text. Each start tag opens a scope,
-except HTML void elements. The self-closing flag on other HTML elements is
-ignored. A matching end tag closes its element and any open descendants. An
-unmatched end tag is ignored; remaining scopes close at EOF. No elements are
-inserted, moved, or cloned. Comments, doctypes, and processing instructions
-remain available in the token APIs but are not retained in the document.
+except HTML void elements and self-closing SVG elements. The self-closing flag
+on other HTML elements is ignored. HTML breakout changes text handling without
+closing lexical document scopes. A matching end tag closes its element and any
+open descendants. An unmatched end tag is ignored; remaining scopes close at
+EOF. No elements are inserted, moved, or cloned. Comments, doctypes, and
+processing instructions remain available in the token APIs but are not retained
+in the document.
 
 For example, `<p>one<p>two` contains nested source scopes; a browser tree
 builder would close the first paragraph. Tables are not repaired, formatting

@@ -111,6 +111,7 @@ pub struct Tokenizer<'a> {
     source: &'a str,
     position: usize,
     state: State,
+    cdata_allowed: bool,
     last_start_tag: Option<Cow<'static, str>>,
     // Only large tags need an index; retain ordinary allocations for subsequent tags.
     attribute_names: Option<HashSet<Cow<'a, str>>>,
@@ -133,6 +134,7 @@ impl<'a> Tokenizer<'a> {
             source,
             position: 0,
             state,
+            cdata_allowed: false,
             last_start_tag: last_start_tag
                 .filter(|name| can_end_text(name))
                 .map(|name| Cow::Owned(name.to_ascii_lowercase())),
@@ -152,6 +154,11 @@ impl<'a> Tokenizer<'a> {
     pub(crate) fn set_static_text_state(&mut self, state: State, name: &'static str) {
         self.state = state;
         self.last_start_tag = Some(Cow::Borrowed(name));
+    }
+
+    /// Recognize CDATA declarations when the reader's current element is SVG.
+    pub(crate) fn set_cdata_allowed(&mut self, allowed: bool) {
+        self.cdata_allowed = allowed;
     }
 
     /// Return the byte offset of the next unread source character.
@@ -868,6 +875,11 @@ impl<'a> Tokenizer<'a> {
                     {
                         self.position += 7;
                         return Some(self.doctype());
+                    }
+                    if self.cdata_allowed && rest.starts_with(b"<![CDATA[") {
+                        self.position += 7;
+                        self.state = State::Cdata;
+                        continue;
                     }
                     return Some(self.bogus_comment(start + 2));
                 }
