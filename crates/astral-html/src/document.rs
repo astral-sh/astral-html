@@ -6,7 +6,7 @@ use std::fmt;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
-use crate::reader::Context;
+use crate::reader::{Context, StartTagAction};
 use crate::tokenizer::matches_normalized_name;
 use crate::{Attribute, Token, Tokenizer};
 
@@ -65,8 +65,9 @@ impl std::error::Error for Error {}
 /// open element with that name and its descendants; unmatched end tags are
 /// ignored. HTML void elements close immediately. The self-closing flag on other
 /// HTML elements is ignored; SVG self-closing elements close immediately.
-/// Remaining elements close at EOF. No elements are
-/// implied, relocated, or cloned: this is not the HTML browser tree-building algorithm.
+/// A new HTML `a` or `option` closes the immediately open element if it has the
+/// same name. Remaining elements close at EOF. No elements are implied,
+/// relocated, or cloned: this is not the HTML browser tree-building algorithm.
 ///
 /// Text states and SVG context follow [`Reader`](crate::Reader). HTML breakout from SVG changes
 /// text handling without closing lexical document scopes.
@@ -130,7 +131,18 @@ impl<'a> Document<'a> {
         loop {
             let mut attributes = match tokenizer.next_with_attribute_buffer(&mut attribute_buffer) {
                 Some(Token::StartTag(mut tag)) => {
-                    let is_void = context.start_tag::<true>(&mut tokenizer, &tag);
+                    let action = context.start_tag::<true>(&mut tokenizer, &tag);
+                    if action == StartTagAction::CloseSameName
+                        && let Some(last) = open.last()
+                        && matches!(
+                            &document.nodes[last.node].kind,
+                            Kind::Element(element) if element.name == tag.name
+                        )
+                    {
+                        let depth = open.len() - 1;
+                        document.close(&mut open, &mut names, depth);
+                    }
+                    let is_void = action == StartTagAction::Close;
                     // The context includes this tag; the lexical scope does not yet.
                     if !is_void
                         && (open.len() >= limits.max_depth || context.depth() > limits.max_depth)

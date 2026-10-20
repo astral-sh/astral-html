@@ -58,34 +58,51 @@ impl<'a> Reader<'a> {
     }
 }
 
+/// The lexical action of an incoming start tag in its current context.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StartTagAction {
+    Open,
+    Close,
+    CloseSameName,
+}
+
 impl<'a> Context<'a> {
     pub(crate) fn depth(&self) -> usize {
         self.svg_scopes.len()
     }
 
-    /// Select the tag's text state. Document also needs to know whether it closes
-    /// immediately; Reader can skip classifying HTML void elements.
+    /// Select the tag's text state. Document also needs its lexical scope action;
+    /// Reader can skip classifying HTML scope changes.
     // Inlining this dispatch can make the tokenizer loop spill the token to the stack.
     #[inline(never)]
     pub(crate) fn start_tag<const REPORT_SCOPE: bool>(
         &mut self,
         tokenizer: &mut Tokenizer<'a>,
         tag: &Tag<'a>,
-    ) -> bool {
+    ) -> StartTagAction {
         if !self.svg_scopes.is_empty() && self.svg_start_tag(tokenizer, tag) {
-            return tag.self_closing;
+            return if tag.self_closing {
+                StartTagAction::Close
+            } else {
+                StartTagAction::Open
+            };
         }
         let (state, name) = match html_tag(&tag.name) {
             HtmlTag::Svg => {
                 self.svg_start_tag(tokenizer, tag);
-                return tag.self_closing;
+                return if tag.self_closing {
+                    StartTagAction::Close
+                } else {
+                    StartTagAction::Open
+                };
             }
             HtmlTag::Text(state, name) => (state, name),
-            HtmlTag::Void => return REPORT_SCOPE,
-            HtmlTag::Other => return false,
+            HtmlTag::Void if REPORT_SCOPE => return StartTagAction::Close,
+            HtmlTag::CloseSameName if REPORT_SCOPE => return StartTagAction::CloseSameName,
+            HtmlTag::Void | HtmlTag::CloseSameName | HtmlTag::Other => return StartTagAction::Open,
         };
         tokenizer.set_static_text_state(state, name);
-        false
+        StartTagAction::Open
     }
 
     /// Select the tag's context before updating its descendants' context.
@@ -103,7 +120,20 @@ impl<'a> Context<'a> {
         let closes = if in_svg {
             tag.self_closing
         } else {
-            matches!(html_tag(&tag.name), HtmlTag::Void)
+            match html_tag(&tag.name) {
+                HtmlTag::Void => true,
+                HtmlTag::CloseSameName => {
+                    if self
+                        .svg_scopes
+                        .last()
+                        .is_some_and(|scope| scope.name == tag.name)
+                    {
+                        self.pop_svg_scope();
+                    }
+                    false
+                }
+                _ => false,
+            }
         };
         if !closes && (in_svg || !self.svg_scopes.is_empty()) {
             self.svg_scopes.push(SvgScope {
@@ -233,6 +263,7 @@ impl std::iter::FusedIterator for Reader<'_> {}
 enum HtmlTag {
     Svg,
     Void,
+    CloseSameName,
     Text(State, &'static str),
     Other,
 }
@@ -242,6 +273,7 @@ enum HtmlTag {
 fn html_tag(name: &str) -> HtmlTag {
     match name {
         "svg" => HtmlTag::Svg,
+        "a" | "option" => HtmlTag::CloseSameName,
         "title" => HtmlTag::Text(State::Rcdata, "title"),
         "textarea" => HtmlTag::Text(State::Rcdata, "textarea"),
         "style" => HtmlTag::Text(State::Rawtext, "style"),

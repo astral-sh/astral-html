@@ -82,15 +82,18 @@ that end tag compared with a browser.
 CDATA sections are recognized when the current element is SVG, including
 integration points; HTML children of integration points use HTML declaration
 rules. This context tracking retains open element names inside SVG, including
-HTML descendants, without browser tree repair. MathML and namespace and
-attribute adjustments remain unsupported. A caller with that context can select
-tokenizer states explicitly. Context storage grows with open elements inside SVG
-and any owned normalized names; HTML-only input needs no context allocation.
+HTML descendants, with the same immediate `a` and `option` closing rule as
+`Document`. MathML and namespace and attribute adjustments remain unsupported. A
+caller with that context can select tokenizer states explicitly. Context storage
+grows with open elements inside SVG and any owned normalized names; HTML-only
+input needs no context allocation.
 
 `Document` retains source-order elements and text. Each start tag opens a scope,
 except HTML void elements and self-closing SVG elements. The self-closing flag
 on other HTML elements is ignored. HTML breakout changes text handling without
-closing lexical document scopes. A matching end tag closes its element and any
+closing lexical document scopes. A new HTML `a` or `option` closes the
+immediately open element if it has the same name; intervening open elements
+prevent this implicit closure. A matching end tag closes its element and any
 open descendants. An unmatched end tag is ignored; remaining scopes close at
 EOF. No elements are inserted, moved, or cloned. Comments, doctypes, and
 processing instructions remain available in the token APIs but are not retained

@@ -77,7 +77,7 @@ fn scopes_are_source_order_and_close_at_matching_end_tags() {
 
 #[test]
 fn repeated_names_restore_the_previous_open_scope() {
-    let document = Document::parse("<a>1<a>2</a>3</a><a>4</a>").unwrap();
+    let document = Document::parse("<div>1<div>2</div>3</div><div>4</div>").unwrap();
     assert_eq!(
         document
             .elements()
@@ -206,9 +206,9 @@ fn document_and_views_are_send_and_sync() {
 #[test]
 fn repeated_names_restore_scopes_after_name_index_promotion() {
     let input = format!(
-        "{}</missing>inner</a>after</a>tail{}<a>sibling</a>",
-        "<a>".repeat(9),
-        "</a>".repeat(7)
+        "{}</missing>inner</div>after</div>tail{}<div>sibling</div>",
+        "<div>".repeat(9),
+        "</div>".repeat(7)
     );
     let document = Document::parse(&input).unwrap();
     let elements: Vec<_> = document.elements().collect();
@@ -227,8 +227,8 @@ fn repeated_names_restore_scopes_after_name_index_promotion() {
 #[test]
 fn deep_mismatched_end_tags_close_the_innermost_matching_scope() {
     let input = format!(
-        "<main>{}<span>inner</a>after</span>tail</main><p>sibling</p>",
-        "<a>".repeat(9),
+        "<main>{}<span>inner</div>after</span>tail</main><p>sibling</p>",
+        "<div>".repeat(9),
     );
     let document = Document::parse(&input).unwrap();
     let elements: Vec<_> = document.elements().collect();
@@ -293,4 +293,30 @@ fn svg_context_counts_toward_depth_limit() {
         Document::parse_with_limits("<div><svg></div><g><path>", limits),
         Err(Error::DepthLimit)
     ));
+}
+
+#[test]
+fn repeated_anchors_and_options_close_before_the_depth_limit() {
+    for name in ["a", "option"] {
+        let input = format!(
+            "<{name}>{}<{name}>one</missing><{name}>two</{name}>after</{name}>tail",
+            "<div>".repeat(9),
+        );
+        let document = Document::parse_with_limits(
+            &input,
+            Limits {
+                max_depth: 11,
+                ..Limits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            document
+                .elements()
+                .filter(|element| element.is(name))
+                .map(|element| element.text())
+                .collect::<Vec<_>>(),
+            ["onetwoafter", "one", "two"]
+        );
+    }
 }

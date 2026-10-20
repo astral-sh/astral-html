@@ -48,6 +48,16 @@ impl<'a> Model<'a> {
                     } else {
                         svg_children || tag.name == "svg"
                     };
+                    if !svg && matches!(tag.name.as_ref(), "a" | "option") {
+                        for stack in [&mut open, &mut foreign] {
+                            if stack
+                                .last()
+                                .is_some_and(|&i| model.elements[i].tag.name == tag.name)
+                            {
+                                stack.pop();
+                            }
+                        }
+                    }
                     let is_void = if svg {
                         tag.self_closing
                     } else {
