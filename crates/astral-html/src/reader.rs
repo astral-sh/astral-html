@@ -80,29 +80,25 @@ impl<'a> Context<'a> {
         tokenizer: &mut Tokenizer<'a>,
         tag: &Tag<'a>,
     ) -> StartTagAction {
-        if !self.svg_scopes.is_empty() && self.svg_start_tag(tokenizer, tag) {
-            return if tag.self_closing {
-                StartTagAction::Close
-            } else {
-                StartTagAction::Open
-            };
-        }
-        let (state, name) = match html_tag(&tag.name) {
-            HtmlTag::Svg => {
-                self.svg_start_tag(tokenizer, tag);
-                return if tag.self_closing {
-                    StartTagAction::Close
-                } else {
-                    StartTagAction::Open
-                };
+        if self.svg_scopes.is_empty() || !self.svg_start_tag(tokenizer, tag) {
+            match html_tag(&tag.name) {
+                HtmlTag::Svg => {
+                    self.svg_start_tag(tokenizer, tag);
+                }
+                HtmlTag::Text(state, name) => {
+                    tokenizer.set_static_text_state(state, name);
+                    return StartTagAction::Open;
+                }
+                HtmlTag::Void if REPORT_SCOPE => return StartTagAction::Close,
+                HtmlTag::CloseSameName if REPORT_SCOPE => return StartTagAction::CloseSameName,
+                _ => return StartTagAction::Open,
             }
-            HtmlTag::Text(state, name) => (state, name),
-            HtmlTag::Void if REPORT_SCOPE => return StartTagAction::Close,
-            HtmlTag::CloseSameName if REPORT_SCOPE => return StartTagAction::CloseSameName,
-            HtmlTag::Void | HtmlTag::CloseSameName | HtmlTag::Other => return StartTagAction::Open,
-        };
-        tokenizer.set_static_text_state(state, name);
-        StartTagAction::Open
+        }
+        if tag.self_closing {
+            StartTagAction::Close
+        } else {
+            StartTagAction::Open
+        }
     }
 
     /// Select the tag's context before updating its descendants' context.
