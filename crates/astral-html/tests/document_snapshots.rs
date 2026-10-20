@@ -181,3 +181,18 @@ fn svg_self_closing_elements_and_html_integration() {
     insta::assert_snapshot!(scopes, @"svg:root title:svg path:svg foreignobject:svg \
         div:foreignobject br:div svg:div path:svg a:root");
 }
+
+#[test]
+fn implicit_closing_respects_svg_context() {
+    let source = "<svg><a>outer<a>inner</a>after</a>\
+                  <foreignObject><a>one<a>two</a>\
+                  <![CDATA[> <a href=ghost>]]></foreignObject></svg>";
+    insta::assert_snapshot!(describe(source), @r#"
+    <svg> parent=None children=["a", "foreignobject"] descendants=["a", "a", "foreignobject", "a", "a"] text="outerinnerafteronetwo> <a href=ghost>"
+    <a> parent=Some("svg") children=["a"] descendants=["a"] text="outerinnerafter"
+    <a> parent=Some("a") children=[] descendants=[] text="inner"
+    <foreignobject> parent=Some("svg") children=["a", "a"] descendants=["a", "a"] text="onetwo> <a href=ghost>"
+    <a> parent=Some("foreignobject") children=[] descendants=[] text="one"
+    <a> parent=Some("foreignobject") children=[] descendants=[] text="two"
+    "#);
+}
