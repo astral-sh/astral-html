@@ -3,7 +3,8 @@ name = "astral-html"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+# The generated named character reference data is BSD-3-Clause licensed.
+license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
 repository.workspace = true
 readme = "../../README.md"
 description = "A high-performance HTML parser designed for document traversal."

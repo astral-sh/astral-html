@@ -13,36 +13,6 @@ from dataclasses import dataclass, field
 
 SOURCE_SHA256 = "d741d877ac77c4194c4ad526b5b4a19aef8dfe411ab840a466891cdbb9f362e6"
 
-WHATWG_NOTICE = """Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
-
-BSD 3-Clause License
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""
-
 
 @dataclass
 class Node:
@@ -119,6 +89,7 @@ def compact_trie(table):
 
 
 def main():
+    crate_root = pathlib.Path(__file__).resolve().parents[1] / "crates/astral-html"
     source = pathlib.Path(sys.argv[1]).read_bytes()
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise SystemExit("source does not match the pinned WHATWG entities.json")
@@ -131,7 +102,8 @@ def main():
         "// Data: https://html.spec.whatwg.org/entities.json (WHATWG named references).",
         "//",
     ]
-    output.extend(f"// {line}" if line else "//" for line in WHATWG_NOTICE.splitlines())
+    notice = (crate_root / "LICENSE-BSD").read_text(encoding="utf-8")
+    output.extend(f"// {line}" if line else "//" for line in notice.splitlines())
     output.extend([
         "",
         "#[cfg(test)]",
@@ -142,7 +114,7 @@ def main():
         output.append(f'    ("{name}", "{escaped}"),')
     output.extend(["];", ""])
     output.extend(compact_trie(table))
-    path = pathlib.Path(__file__).resolve().parents[1] / "crates/astral-html/src/entities_data.rs"
+    path = crate_root / "src/entities_data.rs"
     path.write_text("\n".join(output) + "\n")
 
 

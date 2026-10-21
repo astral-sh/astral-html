@@ -89,7 +89,7 @@ for token in Reader::new(source) {
 
 ## License
 
-astral-html is licensed under either of
+The parser code is licensed under either of
 
 - Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
   <https://www.apache.org/licenses/LICENSE-2.0>)
@@ -101,3 +101,6 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in astral-html by you, as defined in the Apache-2.0 license, shall
 be dually licensed as above, without any additional terms or conditions.
+
+The generated named character reference data is licensed under the
+[BSD 3-Clause License](LICENSE-BSD).
