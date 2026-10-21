@@ -2,6 +2,7 @@
 
 `crates/astral-html/src/entities_data.rs` is generated directly from WHATWG's
 [named character references](https://html.spec.whatwg.org/entities.json). The
+data is licensed under the [BSD 3-Clause License](../LICENSE-BSD), and the
 source checksum is pinned in `scripts/generate_entities.py`.
 
 To regenerate the checked-in table:
