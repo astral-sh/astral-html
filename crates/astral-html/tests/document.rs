@@ -1,6 +1,6 @@
 //! Read-only document semantics, resource limits, and stack-independent traversal.
 
-use astral_html::{Document, Error, Limits, Reader, Token};
+use astral_html::{Document, Error, Limits, Node, Reader, Token};
 
 #[test]
 fn reads_attributes_and_text_without_mutation() {
@@ -20,6 +20,24 @@ fn reads_attributes_and_text_without_mutation() {
         anchor.children().next().unwrap().parent().unwrap().name(),
         "a"
     );
+}
+
+#[test]
+fn traverses_text_and_element_nodes_in_source_order() {
+    fn render<'doc, 'src: 'doc>(nodes: impl Iterator<Item = Node<'doc, 'src>>) -> String {
+        nodes
+            .map(|node| match node {
+                Node::Element(element) => format!("<{}>", element.name()),
+                Node::Text(text) => text.to_owned(),
+            })
+            .collect()
+    }
+
+    let document =
+        Document::parse("head<div>before&amp;<b><i>nested</i></b>after</div>tail").unwrap();
+    assert_eq!(render(document.root_nodes()), "head<div>tail");
+    let div = document.elements().next().unwrap();
+    assert_eq!(render(div.child_nodes()), "before&<b>after");
 }
 
 #[test]

@@ -2,7 +2,7 @@
 //!
 //! [`Reader`] yields tokens in source order and selects HTML text states.
 //! [`Tokenizer`] gives callers explicit control over those states. [`Document`]
-//! retains lexical element scopes for repeated queries, with configurable [`Limits`].
+//! retains lexical element scopes and text for repeated queries, with configurable [`Limits`].
 //!
 //! Input must already be decoded UTF-8. Unchanged strings borrow from that input.
 //! The reader tracks SVG text contexts, but the parser does not implement browser
@@ -16,7 +16,7 @@ mod entities_data;
 mod reader;
 mod tokenizer;
 
-pub use document::{Document, Element, Error, Limits};
+pub use document::{Document, Element, Error, Limits, Node};
 pub use entities::{decode, normalize};
 pub use reader::Reader;
 pub use tokenizer::{Attribute, Doctype, State, Tag, Token, Tokenizer};

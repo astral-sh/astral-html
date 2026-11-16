@@ -71,14 +71,15 @@ impl std::error::Error for Error {}
 ///
 /// Text states and SVG context follow [`Reader`](crate::Reader). HTML breakout from SVG changes
 /// text handling without closing lexical document scopes.
+/// Comments, doctypes, and processing instructions are not retained.
 ///
 /// Construction, traversal, and destruction use flat storage without recursion.
 pub struct Document<'a> {
-    nodes: Vec<Node<'a>>,
+    nodes: Vec<NodeData<'a>>,
     attributes: Vec<Attribute<'a>>,
 }
 
-struct Node<'a> {
+struct NodeData<'a> {
     kind: Kind<'a>,
     // One-based parent index reserves zero for root nodes.
     parent: Option<NonZeroUsize>,
@@ -171,7 +172,7 @@ impl<'a> Document<'a> {
                     } else {
                         document.attributes.append(&mut tag.attributes);
                     }
-                    document.nodes.push(Node {
+                    document.nodes.push(NodeData {
                         kind: Kind::Element(ElementData {
                             name: tag.name,
                             attributes: start..document.attributes.len(),
@@ -222,7 +223,7 @@ impl<'a> Document<'a> {
                         if index >= limits.max_nodes {
                             return Err(Error::NodeLimit);
                         }
-                        document.nodes.push(Node {
+                        document.nodes.push(NodeData {
                             kind: Kind::Text(text),
                             parent: open
                                 .last()
@@ -280,6 +281,11 @@ impl<'a> Document<'a> {
         self.elements_in(0, self.nodes.len())
     }
 
+    /// Iterate over root elements and text segments in source order.
+    pub fn root_nodes(&self) -> impl Iterator<Item = Node<'_, 'a>> {
+        self.child_nodes_in(0, self.nodes.len())
+    }
+
     fn elements_in(&self, start: usize, end: usize) -> impl Iterator<Item = Element<'_, 'a>> {
         (start..end).filter_map(|index| {
             matches!(self.nodes[index].kind, Kind::Element(_)).then_some(Element {
@@ -288,6 +294,35 @@ impl<'a> Document<'a> {
             })
         })
     }
+
+    fn child_nodes_in(&self, mut cursor: usize, end: usize) -> impl Iterator<Item = Node<'_, 'a>> {
+        std::iter::from_fn(move || {
+            if cursor >= end {
+                return None;
+            }
+            let index = cursor;
+            let node = &self.nodes[index];
+            cursor = node.end;
+            Some(match &node.kind {
+                Kind::Element(_) => Node::Element(Element {
+                    document: self,
+                    index,
+                }),
+                Kind::Text(text) => Node::Text(text.as_ref()),
+            })
+        })
+    }
+}
+
+/// A borrowed element or text segment in a [`Document`].
+#[derive(Debug, Clone, Copy)]
+pub enum Node<'doc, 'src> {
+    /// An element and its lexical scope.
+    Element(Element<'doc, 'src>),
+    /// A text segment, with newlines normalized and character references decoded
+    /// according to the tokenizer state. Adjacent text segments can occur, and
+    /// the boundaries between them are unspecified.
+    Text(&'doc str),
 }
 
 /// A borrowed view of an element in a [`Document`].
@@ -354,22 +389,16 @@ impl<'doc, 'src> Element<'doc, 'src> {
 
     /// Iterate over direct child elements in source order.
     pub fn children(self) -> impl Iterator<Item = Self> {
-        let mut cursor = self.index + 1;
-        let end = self.document.nodes[self.index].end;
-        std::iter::from_fn(move || {
-            while cursor < end {
-                let index = cursor;
-                let node = &self.document.nodes[index];
-                cursor = node.end;
-                if matches!(node.kind, Kind::Element(_)) {
-                    return Some(Self {
-                        document: self.document,
-                        index,
-                    });
-                }
-            }
-            None
+        self.child_nodes().filter_map(|node| match node {
+            Node::Element(element) => Some(element),
+            Node::Text(_) => None,
         })
+    }
+
+    /// Iterate over direct child elements and text segments in source order.
+    pub fn child_nodes(self) -> impl Iterator<Item = Node<'doc, 'src>> {
+        self.document
+            .child_nodes_in(self.index + 1, self.document.nodes[self.index].end)
     }
 
     /// Concatenate descendant text in source order, excluding comments and declarations.
